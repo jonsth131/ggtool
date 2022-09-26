@@ -20,9 +20,6 @@ fn read_metadata(data: &Vec<u8>) -> Result<Vec<directory::File>, std::io::Error>
     // Jump to offset table
     br.jmp(table_offset as usize);
     let _ = br.read_u8()?; // Unk, always 7?
-    let _files_offset = br.read_u32()?; // Always points to "files"?
-
-    let mut files: Vec<directory::File> = Vec::new();
 
     let mut components: Vec<String> = Vec::new();
 
@@ -31,28 +28,13 @@ fn read_metadata(data: &Vec<u8>) -> Result<Vec<directory::File>, std::io::Error>
         if offset == 0xFF_FF_FF_FF {
             break;
         }
-        let filename = br.read_at(offset as usize, |br| br.read_cstr())?;
-        if filename == "filename"
-            || filename == "files"
-            || filename == "size"
-            || filename == "offset"
-        {
-            continue;
-        }
-        if filename == "guid" {
-            break;
-        }
-        components.push(filename);
+        let value = br.read_at(offset as usize, |br| br.read_cstr())?;
+        components.push(value);
     }
 
-    // println!("{:?}", components);
-    let files: Vec<directory::File> = components.chunks(3).map(|c| directory::File {
-        filename: c[0].clone(),
-        offset: c[1].parse::<u32>().expect(&format!("offset failed: {}", c[1])),
-        size: c[2].parse::<u32>().expect(&format!("size failed: {}", c[2])),
-    }).collect();
+    println!("{:?}", components);
 
-    Ok(files)
+    Ok(Vec::new())
 }
 
 fn main() {
