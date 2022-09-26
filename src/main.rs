@@ -1,13 +1,12 @@
 mod binary_reader_extensions;
+mod directory;
 
 use binary_reader::{BinaryReader, Endian};
 use binary_reader_extensions::ReadAt;
 use std::fs::File;
 use std::path::Path;
 
-type Metadata = Vec<(String, String)>;
-
-fn read_metadata(data: &Vec<u8>) -> Result<Metadata, std::io::Error> {
+fn read_metadata(data: &Vec<u8>) -> Result<Vec<directory::File>, std::io::Error> {
     let mut br = BinaryReader::from_vec(data);
     br.set_endian(Endian::Little);
     let magic = br.read_u32()?;
@@ -23,22 +22,37 @@ fn read_metadata(data: &Vec<u8>) -> Result<Metadata, std::io::Error> {
     let _ = br.read_u8()?; // Unk, always 7?
     let _files_offset = br.read_u32()?; // Always points to "files"?
 
-    let mut meta: Vec<(String, String)> = Vec::new();
+    let mut files: Vec<directory::File> = Vec::new();
+
+    let mut components: Vec<String> = Vec::new();
 
     loop {
-        let key_offset = br.read_u32()?;
-        if key_offset == 0xFF_FF_FF_FF {
+        let offset = br.read_u32()?;
+        if offset == 0xFF_FF_FF_FF {
             break;
         }
-        let key = br.read_at(key_offset as usize, |br| br.read_cstr())?;
-
-        let value_offset = br.read_u32()?;
-        let value = br.read_at(value_offset as usize, |br| br.read_cstr())?;
-
-        meta.push((key, value));
+        let filename = br.read_at(offset as usize, |br| br.read_cstr())?;
+        if filename == "filename"
+            || filename == "files"
+            || filename == "size"
+            || filename == "offset"
+        {
+            continue;
+        }
+        if filename == "guid" {
+            break;
+        }
+        components.push(filename);
     }
 
-    Ok(meta)
+    // println!("{:?}", components);
+    let files: Vec<directory::File> = components.chunks(3).map(|c| directory::File {
+        filename: c[0].clone(),
+        offset: c[1].parse::<u32>().expect(&format!("offset failed: {}", c[1])),
+        size: c[2].parse::<u32>().expect(&format!("size failed: {}", c[2])),
+    }).collect();
+
+    Ok(files)
 }
 
 fn main() {
@@ -55,8 +69,8 @@ fn main() {
     std::fs::write("out/blah.bin", &data).unwrap();
 
     let metatable = read_metadata(&data).expect("Failed to parse file metadata");
-    for (key, value) in metatable {
-        println!("{} = {}", key, value);
+    for file in metatable {
+        println!("{} @ {} # {}", file.filename, file.offset, file.size);
     }
 }
 
