@@ -1,4 +1,7 @@
+mod binary_reader_extensions;
+
 use binary_reader::{BinaryReader, Endian};
+use binary_reader_extensions::ReadAt;
 use std::fs::File;
 use std::path::Path;
 
@@ -8,7 +11,10 @@ fn read_metadata(data: &Vec<u8>) -> Result<Metadata, std::io::Error> {
     let mut br = BinaryReader::from_vec(data);
     br.set_endian(Endian::Little);
     let magic = br.read_u32()?;
-    assert!(magic == 0x04030201, "decryption magic signature wasn't 01 02 03 04");
+    assert!(
+        magic == 0x04030201,
+        "decryption magic signature wasn't 01 02 03 04"
+    );
     let _ = br.read_u32()?; // Unk
     let table_offset = br.read_u32()?;
 
@@ -23,23 +29,15 @@ fn read_metadata(data: &Vec<u8>) -> Result<Metadata, std::io::Error> {
         let key_offset = br.read_u32()?;
         if key_offset == 0xFF_FF_FF_FF {
             break;
-        }  
-        
-        let p = br.pos;
-        br.jmp(key_offset as usize);
-        let key = br.read_cstr()?;
-        br.jmp(p);
+        }
+        let key = br.read_at(key_offset as usize, |br| br.read_cstr())?;
 
         let value_offset = br.read_u32()?;
-
-        let p = br.pos;
-        br.jmp(value_offset as usize);
-        let value = br.read_cstr()?;
-        br.jmp(p);
+        let value = br.read_at(value_offset as usize, |br| br.read_cstr())?;
 
         meta.push((key, value));
-    } 
-    
+    }
+
     Ok(meta)
 }
 
@@ -49,7 +47,7 @@ fn main() {
         eprintln!("usage: ggtool <pack-file>");
         std::process::exit(1);
     }
-    
+
     let pack_path = &args[1];
 
     let mut data = read_root(&pack_path);
