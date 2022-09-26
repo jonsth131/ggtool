@@ -52,7 +52,7 @@ fn main() {
 
     let mut data = read_root(&pack_path);
     decode_data(&mut data);
-    std::fs::write("blah.bin", &data).unwrap();
+    std::fs::write("out/blah.bin", &data).unwrap();
 
     let metatable = read_metadata(&data).expect("Failed to parse file metadata");
     for (key, value) in metatable {
