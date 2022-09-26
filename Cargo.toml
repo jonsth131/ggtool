@@ -1,5 +1,5 @@
 [package]
-name = "ggunpack"
+name = "ggtool"
 version = "0.1.0"
 edition = "2021"
 
@@ -9,5 +9,5 @@ edition = "2021"
 binary-reader = "0.4.5"
 
 [[bin]]
-name = "ggunpack"
-path = "main.rs"
+name = "ggtool"
+path = "src/main.rs"
