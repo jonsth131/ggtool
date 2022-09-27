@@ -11,7 +11,7 @@ use std::{
     path::Path,
 };
 
-use crate::decoder::decode_data;
+use crate::{decoder::decode_data, directory::GGValue};
 
 pub fn decode_at(
     reader: &mut BufReader<File>,
@@ -56,7 +56,7 @@ enum Commands {
         // Name of the file to extract
         filename: String,
         // Output path
-        outpath: String
+        outpath: String,
     },
 }
 
@@ -74,7 +74,8 @@ fn main() {
 
     let directory_data =
         decode_at(&mut reader, &keys, offset, size).expect("Failed to decode directory");
-    let directory = directory::Directory::parse(directory_data).expect("Failed to parse directory");
+
+    let directory = GGValue::parse(directory_data).expect("Failed to parse directory");
 
     let file_list = directory.get_files();
 
@@ -98,10 +99,19 @@ fn main() {
             reader
                 .seek(SeekFrom::Start(file.offset))
                 .expect("Failed to seek to offset");
+
             let mut data = read_bytes(&mut reader, file.size).expect("Failed to read data");
             decode_data(&mut data, &keys.key1, &keys.key2);
 
-            std::fs::write(outpath + "/" + file.filename, data).expect("Failed to write data to disk");
+            if file.filename.ends_with(".json") {
+                let expanded = GGValue::parse(data).expect("Failed to expand .json");
+
+                std::fs::write(outpath + "/" + file.filename, serde_json::to_string_pretty(&expanded).unwrap())
+                    .expect("Failed to write data to disk");
+            } else {
+                std::fs::write(outpath + "/" + file.filename, data)
+                    .expect("Failed to write data to disk");
+            }
         }
     }
 }

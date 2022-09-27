@@ -1,5 +1,9 @@
 use crate::easy_br::EasyRead;
 use byteorder::ReadBytesExt;
+use serde::{
+    ser::{SerializeMap, SerializeSeq},
+    Serialize,
+};
 use std::{
     collections::HashMap,
     io::{Cursor, SeekFrom},
@@ -26,12 +30,44 @@ impl From<u8> for GGValueType {
 
 type IOResult<T> = Result<T, std::io::Error>;
 
-#[derive(Debug)]
 pub enum GGValue {
     GGDict(HashMap<String, GGValue>),
     GGList(Vec<GGValue>),
     GGString(String),
     GGInt(u32),
+}
+
+impl Serialize for GGValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            GGValue::GGDict(d) => {
+                let mut map = serializer.serialize_map(Some(d.len()))?;
+                for (k, v) in d {
+                    map.serialize_entry(k, v)?;
+                }
+                map.end()
+            }
+            GGValue::GGList(l) => {
+                let mut seq = serializer.serialize_seq(Some(l.len()))?;
+                for element in l {
+                    seq.serialize_element(element)?;
+                }
+                seq.end()
+            }
+            GGValue::GGString(s) => serializer.serialize_str(&s),
+            GGValue::GGInt(i) => serializer.serialize_u32(*i),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub struct File<'a> {
+    pub filename: &'a String,
+    pub size: usize,
+    pub offset: u64,
 }
 
 impl GGValue {
@@ -58,6 +94,71 @@ impl GGValue {
             GGValue::GGInt(i) => i,
             _ => panic!("Expected int"),
         }
+    }
+
+    pub fn get_files<'a>(&'a self) -> Vec<File<'a>> {
+        let rootdict = self.expect_dict();
+
+        rootdict
+            .get("files")
+            .expect("files entry not found!")
+            .expect_list()
+            .iter()
+            .map(|entry| {
+                let entry_dict = entry.expect_dict();
+
+                let filename = entry_dict
+                    .get("filename")
+                    .expect("filename entry not found!")
+                    .expect_string();
+
+                let offset = (*entry_dict
+                    .get("offset")
+                    .expect("offset entry not found!")
+                    .expect_int()) as u64;
+                let size = *entry_dict
+                    .get("size")
+                    .expect("size entry not found!")
+                    .expect_int() as usize;
+                File {
+                    filename,
+                    offset,
+                    size,
+                }
+            })
+            .collect()
+    }
+
+    pub fn parse(data: Vec<u8>) -> IOResult<Self> {
+        let mut reader = Cursor::new(data);
+
+        let magic = reader.read_u32_le()?;
+        assert!(magic == 0x04030201, "Magic must be 01 02 03 04");
+
+        let _num_tables = reader.read_u32_le()?; // Skip for now
+
+        let offset_to_table = reader.read_u32_le()? as u64;
+
+        let offsets = reader.read_at(SeekFrom::Start(offset_to_table), |reader| {
+            // This may be cheating but let's just do it for now
+            let table_type = reader.read_u8()?;
+            assert!(table_type == 7);
+
+            let mut offsets = Vec::new();
+            loop {
+                let offset = reader.read_u32_le()?;
+                if offset == 0xFF_FF_FF_FF {
+                    break;
+                }
+
+                offsets.push(offset);
+            }
+
+            Ok(offsets)
+        })?;
+
+        let mut directory_builder = DirectoryBuilder { reader, offsets };
+        directory_builder.read_ggvalue()
     }
 }
 
@@ -130,79 +231,5 @@ impl DirectoryBuilder {
             GGValueType::String => self.read_string(),
             GGValueType::Integer => self.read_integer(),
         }
-    }
-}
-
-pub struct Directory {
-    root: GGValue,
-}
-
-#[derive(Debug)]
-pub struct File<'a> {
-    pub filename: &'a String,
-    pub size: usize,
-    pub offset: u64
-}
-
-impl Directory {
-    pub fn parse(data: Vec<u8>) -> IOResult<Directory> {
-        let mut reader = Cursor::new(data);
-
-        let magic = reader.read_u32_le()?;
-        assert!(magic == 0x04030201, "Magic must be 01 02 03 04");
-
-        let _num_tables = reader.read_u32_le()?; // Skip for now
-
-        let offset_to_table = reader.read_u32_le()? as u64;
-
-        let offsets = reader.read_at(SeekFrom::Start(offset_to_table), |reader| {
-            // This may be cheating but let's just do it for now
-            let table_type = reader.read_u8()?;
-            assert!(table_type == 7);
-
-            let mut offsets = Vec::new();
-            loop {
-                let offset = reader.read_u32_le()?;
-                if offset == 0xFF_FF_FF_FF {
-                    break;
-                }
-
-                offsets.push(offset);
-            }
-
-            Ok(offsets)
-        })?;
-
-        let mut directory_builder = DirectoryBuilder { reader, offsets };
-        Ok(Self {
-            root: directory_builder.read_ggvalue()?,
-        })
-    }
-
-    pub fn get_files<'a>(&'a self) -> Vec<File<'a>> {
-        let rootdict = self.root.expect_dict();
-
-        rootdict
-            .get("files")
-            .expect("files entry not found!")
-            .expect_list()
-            .iter()
-            .map(|entry| {
-                let entry_dict = entry.expect_dict();
-
-                let filename = entry_dict
-                    .get("filename")
-                    .expect("filename entry not found!")
-                    .expect_string();
-
-                let offset = *entry_dict.get("offset").expect("offset entry not found!").expect_int() as u64;
-                let size = *entry_dict.get("size").expect("size entry not found!").expect_int() as usize;
-                File {
-                    filename, 
-                    offset, 
-                    size
-                }
-            })
-            .collect()        
     }
 }
