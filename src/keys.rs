@@ -31,7 +31,7 @@ impl Keys {
         Ok(Self { key1, key2 })
     }
 
-    pub fn from_path(path: &str) -> Self {
+    pub fn from_disk() -> Self {
         let key1 = std::fs::read("keys/key1.bin")
             .expect("Failed to read keys/key1.bin. Run extract-keys first");
 

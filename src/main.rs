@@ -71,7 +71,7 @@ struct OpenGGPack {
 }
 
 fn open_ggpack(pack_path: &str) -> OpenGGPack {
-    let keys = Keys::from_path("keys");
+    let keys = Keys::from_disk();
 
     let file = File::open(&Path::new(pack_path)).unwrap();
     let mut reader = BufReader::new(file);
