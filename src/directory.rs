@@ -14,6 +14,10 @@ pub enum GGValueType {
     List = 3,
     String = 4,
     Integer = 5,
+    Float = 6,
+    Coordinate = 9,
+    CoordinateList = 10,
+    Hotspot = 11,
 }
 
 impl From<u8> for GGValueType {
@@ -23,6 +27,10 @@ impl From<u8> for GGValueType {
             3 => GGValueType::List,
             4 => GGValueType::String,
             5 => GGValueType::Integer,
+            6 => GGValueType::Float,
+            9 => GGValueType::Coordinate,
+            10 => GGValueType::CoordinateList,
+            11 => GGValueType::Hotspot,
             _ => panic!("{} is not a known GGValueType", a),
         }
     }
@@ -34,7 +42,7 @@ pub enum GGValue {
     GGDict(HashMap<String, GGValue>),
     GGList(Vec<GGValue>),
     GGString(String),
-    GGInt(u32),
+    GGNumber(f32),
 }
 
 impl Serialize for GGValue {
@@ -58,7 +66,7 @@ impl Serialize for GGValue {
                 seq.end()
             }
             GGValue::GGString(s) => serializer.serialize_str(&s),
-            GGValue::GGInt(i) => serializer.serialize_u32(*i),
+            GGValue::GGNumber(f) => serializer.serialize_f32(*f),
         }
     }
 }
@@ -89,9 +97,9 @@ impl GGValue {
             _ => panic!("Expected string"),
         }
     }
-    pub fn expect_int(&self) -> &u32 {
+    pub fn expect_number(&self) -> &f32 {
         match self {
-            GGValue::GGInt(i) => i,
+            GGValue::GGNumber(f) => f,
             _ => panic!("Expected int"),
         }
     }
@@ -115,11 +123,11 @@ impl GGValue {
                 let offset = (*entry_dict
                     .get("offset")
                     .expect("offset entry not found!")
-                    .expect_int()) as u64;
+                    .expect_number()) as u64;
                 let size = *entry_dict
                     .get("size")
                     .expect("size entry not found!")
-                    .expect_int() as usize;
+                    .expect_number() as usize;
                 File {
                     filename,
                     offset,
@@ -214,13 +222,13 @@ impl DirectoryBuilder {
         Ok(GGValue::GGString(entry))
     }
 
-    fn read_integer(&mut self) -> IOResult<GGValue> {
+    fn read_number(&mut self) -> IOResult<GGValue> {
         let entry = self.read_table_entry()?;
-        let num: u32 = entry
+        let num: f32 = entry
             .parse()
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
 
-        Ok(GGValue::GGInt(num))
+        Ok(GGValue::GGNumber(num))
     }
 
     fn read_ggvalue(&mut self) -> IOResult<GGValue> {
@@ -229,7 +237,11 @@ impl DirectoryBuilder {
             GGValueType::Dictionary => self.read_dict(),
             GGValueType::List => self.read_list(),
             GGValueType::String => self.read_string(),
-            GGValueType::Integer => self.read_integer(),
+            GGValueType::Integer => self.read_number(),
+            GGValueType::Float => self.read_number(),
+            GGValueType::Coordinate => self.read_string(),
+            GGValueType::CoordinateList => self.read_string(),
+            GGValueType::Hotspot => self.read_string(),
         }
     }
 }

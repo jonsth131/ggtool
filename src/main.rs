@@ -96,7 +96,7 @@ fn list_files(pack_path: &str) {
     let file_list = ggpack.directory.get_files();
     let filenames: Vec<&String> = file_list.iter().map(|f| f.filename).collect();
 
-    println!("{:#?}", filenames);
+    println!("{}", serde_json::to_string_pretty(&filenames).unwrap());
 }
 
 fn extract_file(pack_path: &str, filename: &str, outpath: &str) {
@@ -123,8 +123,8 @@ fn extract_file(pack_path: &str, filename: &str, outpath: &str) {
 
     let final_path = format!("{}/{}", outpath, file.filename);
 
-    if file.filename.ends_with(".json") {
-        let expanded = GGValue::parse(data).expect("Failed to expand .json");
+    if file.filename.ends_with(".json") || file.filename.ends_with(".wimpy") {
+        let expanded = GGValue::parse(data).expect("Failed to expand file");
 
         std::fs::write(final_path, serde_json::to_string_pretty(&expanded).unwrap())
             .expect("Failed to write data to disk");
