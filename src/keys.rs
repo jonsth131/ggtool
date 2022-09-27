@@ -1,4 +1,4 @@
-use std::{fs::File, io::Read, path::Path};
+use std::{fs::File, io::Read, io::Seek, io::SeekFrom, path::Path};
 
 pub struct Keys {
     pub key1: Vec<u8>,
@@ -8,6 +8,7 @@ pub struct Keys {
 pub fn read_keys(exe_path: &str) -> Result<Keys, std::io::Error> {
     let mut ef = File::open(&Path::new(exe_path)).unwrap();
     let mut exe_data = Vec::new();
+    ef.seek(SeekFrom::Start(4000000))?;
     ef.read_to_end(&mut exe_data)?;
     let key1 = read_key(
         &exe_data,
