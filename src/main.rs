@@ -11,7 +11,7 @@ fn main() {
 
     let pack_path = &args[1];
 
-    let mut data = read_root(&pack_path);
+    let data = read_root(&pack_path);
     // std::fs::write("out/blah.bin", &data).unwrap();
 
     let metatable = read_metadata(&data).expect("Failed to parse file metadata");
