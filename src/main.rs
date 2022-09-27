@@ -11,7 +11,10 @@ use std::{
     path::Path,
 };
 
-use crate::{decoder::decode_data, directory::GGValue};
+use crate::{
+    decoder::{decode_data, decode_yack_data},
+    directory::GGValue,
+};
 
 pub fn decode_at(
     reader: &mut BufReader<File>,
@@ -60,6 +63,7 @@ fn extract_keys(exe_path: &str) {
     let keys = Keys::extract_from_exe(exe_path).expect("Failed to extract keys from exe file");
     std::fs::write("keys/key1.bin", keys.key1).expect("Failed to write keys/key1.bin");
     std::fs::write("keys/key2.bin", keys.key2).expect("Failed to write keys/key2.bin");
+    std::fs::write("keys/key3.bin", keys.key3).expect("Failed to write keys/key3.bin");
 
     println!("Keys extracted successfully!");
 }
@@ -119,7 +123,12 @@ fn extract_file(pack_path: &str, filename: &str, outpath: &str) {
         .expect("Failed to seek to offset");
 
     let mut data = read_bytes(&mut ggpack.reader, file.size).expect("Failed to read data");
+
     decode_data(&mut data, &ggpack.keys.key1, &ggpack.keys.key2);
+
+    if file.filename.ends_with(".yack") {
+        decode_yack_data(&mut data, &ggpack.keys.key3, &file.filename);
+    }
 
     let final_path = format!("{}/{}", outpath, file.filename);
 

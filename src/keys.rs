@@ -3,6 +3,7 @@ use std::{fs::File, io::Read, io::Seek, io::SeekFrom, path::Path};
 pub struct Keys {
     pub key1: Vec<u8>,
     pub key2: Vec<u8>,
+    pub key3: Vec<u8>,
 }
 
 impl Keys {
@@ -27,8 +28,16 @@ impl Keys {
             ],
             256,
         )?;
+        let key3 = read_key(
+            &exe_data,
+            &[
+                0x1F, 0xB5, 0xD6, 0xE7, 0xA2, 0x88, 0x8D, 0x75, 0xC1, 0xC4, 0xB9, 0x6B, 0x03, 0x04,
+                0x56, 0xD3,
+            ],
+            1024,
+        )?;
 
-        Ok(Self { key1, key2 })
+        Ok(Self { key1, key2, key3 })
     }
 
     pub fn from_disk() -> Self {
@@ -38,7 +47,10 @@ impl Keys {
         let key2 = std::fs::read("keys/key2.bin")
             .expect("Failed to read keys/key2.bin. Run extract-keys first");
 
-        Self { key1, key2 }
+        let key3 = std::fs::read("keys/key3.bin")
+            .expect("Failed to read keys/key3.bin. Run extract-keys first");
+
+        Self { key1, key2, key3 }
     }
 }
 
