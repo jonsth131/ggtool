@@ -128,6 +128,10 @@ fn extract_file(pack_path: &str, filename: &str, outpath: &str) {
 
         std::fs::write(final_path, serde_json::to_string_pretty(&expanded).unwrap())
             .expect("Failed to write data to disk");
+    } else if file.filename.ends_with(".ktxbz") || file.filename.ends_with(".ktxaz") {
+        let decompressed =
+            inflate::inflate_bytes_zlib(&data).expect("Failed to inflate compressed data");
+        std::fs::write(final_path, decompressed).expect("Failed to write data to disk");
     } else {
         std::fs::write(final_path, data).expect("Failed to write data to disk");
     }
