@@ -1,13 +1,16 @@
-mod directory;
 mod decoder;
-
-use std::{fs::File, path::Path, io::{BufReader, Read, Seek, SeekFrom, Cursor}};
-
-use byteorder::{ReadBytesExt, LittleEndian};
+mod directory;
+mod easy_br;
+use easy_br::EasyRead;
+use std::{
+    fs::File,
+    io::{BufReader, Cursor, Read, Seek, SeekFrom},
+    path::Path,
+};
 
 pub fn open_file(file_name: &str) -> BufReader<File> {
     let file = File::open(&Path::new(file_name)).unwrap();
-    let reader = BufReader::new(file);    
+    let reader = BufReader::new(file);
     return reader;
 }
 
@@ -26,14 +29,13 @@ pub fn read_root(file_name: &str) -> Result<Vec<u8>, std::io::Error> {
     let key1 = read_file("keys/key1.bin", 65536)?;
     let key2 = read_file("keys/key2.bin", 256)?;
 
-
     let mut reader = open_file(file_name);
-    let offset = reader.read_u32::<LittleEndian>().unwrap();
-    let size = reader.read_u32::<LittleEndian>().unwrap();
+    let offset = reader.read_u32_le().unwrap();
+    let size = reader.read_u32_le().unwrap();
     reader.seek(SeekFrom::Start(offset as u64))?;
 
     let mut data = read_bytes(&mut reader, size as usize)?;
-    
+
     decoder::decode_data(&mut data, &key1, &key2);
 
     Ok(data)
