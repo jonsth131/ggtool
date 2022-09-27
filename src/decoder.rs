@@ -1,4 +1,3 @@
-
 pub fn decode_data(data: &mut Vec<u8>, key1: &Vec<u8>, key2: &Vec<u8>) {
     let mut xor_sum = (data.len() + 120) as u16;
 
