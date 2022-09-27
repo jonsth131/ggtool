@@ -1,7 +1,7 @@
 mod decoder;
 mod directory;
 mod easy_br;
-use clap::{Parser, Subcommand};
+use clap::Parser;
 mod keys;
 use easy_br::EasyRead;
 use keys::Keys;
@@ -34,25 +34,21 @@ fn read_bytes(reader: &mut BufReader<File>, count: usize) -> Result<Vec<u8>, std
 /// Return to Monkey Island ggpack tool
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
-struct Args {
-    /// Path to Return to Monkey Island.exe
-    #[clap(value_parser)]
-    exe_path: String,
-
-    /// Path to the ggpack-file
-    #[clap(value_parser)]
-    pack_path: String,
-
-    #[clap(subcommand)]
-    command: Commands,
-}
-
-#[derive(Subcommand, Debug)]
-enum Commands {
+enum Args {
+    /// Extracts encryption keys from Return to Monkey Island.exe
+    ExtractKeys {
+        /// Path to Return to Monkey Island.exe
+        exe_path: String,
+    },
     /// Lists files in the ggpack
-    ListFiles,
+    ListFiles {
+        /// Path to the ggpack-file
+        pack_path: String,
+    },
     /// Extracts a file
     ExtractFile {
+        /// Path to the ggpack-file
+        pack_path: String,
         // Name of the file to extract
         filename: String,
         // Output path
@@ -60,11 +56,24 @@ enum Commands {
     },
 }
 
-fn main() {
-    let args = Args::parse();
-    let keys = keys::read_keys(&args.exe_path).expect("Failed to extract keys from exe file");
+fn extract_keys(exe_path: &str) {
+    let keys = Keys::extract_from_exe(exe_path).expect("Failed to extract keys from exe file");
+    std::fs::write("keys/key1.bin", keys.key1).expect("Failed to write keys/key1.bin");
+    std::fs::write("keys/key2.bin", keys.key2).expect("Failed to write keys/key2.bin");
 
-    let file = File::open(&Path::new(&args.pack_path)).unwrap();
+    println!("Keys extracted successfully!");
+}
+
+struct OpenGGPack {
+    reader: BufReader<File>,
+    directory: GGValue,
+    keys: Keys,
+}
+
+fn open_ggpack(pack_path: &str) -> OpenGGPack {
+    let keys = Keys::from_path("keys");
+
+    let file = File::open(&Path::new(pack_path)).unwrap();
     let mut reader = BufReader::new(file);
 
     let offset = reader
@@ -75,43 +84,64 @@ fn main() {
     let directory_data =
         decode_at(&mut reader, &keys, offset, size).expect("Failed to decode directory");
 
-    let directory = GGValue::parse(directory_data).expect("Failed to parse directory");
+    OpenGGPack {
+        reader,
+        directory: GGValue::parse(directory_data).expect("Failed to parse directory"),
+        keys,
+    }
+}
 
-    let file_list = directory.get_files();
+fn list_files(pack_path: &str) {
+    let ggpack = open_ggpack(pack_path);
+    let file_list = ggpack.directory.get_files();
+    let filenames: Vec<&String> = file_list.iter().map(|f| f.filename).collect();
 
-    match args.command {
-        Commands::ListFiles => {
-            let filenames: Vec<&String> = file_list.iter().map(|f| f.filename).collect();
+    println!("{:#?}", filenames);
+}
 
-            println!("{:#?}", filenames);
-        }
-        Commands::ExtractFile { filename, outpath } => {
-            let file = file_list
-                .iter()
-                .find(|f| f.filename.eq(&filename))
-                .expect("File not found in ggpack");
+fn extract_file(pack_path: &str, filename: &str, outpath: &str) {
+    let mut ggpack = open_ggpack(pack_path);
+    let file_list = ggpack.directory.get_files();
 
-            println!(
-                "Extracting {}. Size = {}, offset = {}",
-                file.filename, file.size, file.offset
-            );
+    let file = file_list
+        .iter()
+        .find(|f| f.filename.eq(&filename))
+        .expect("File not found in ggpack");
 
-            reader
-                .seek(SeekFrom::Start(file.offset))
-                .expect("Failed to seek to offset");
+    println!(
+        "Extracting {}. Size = {}, offset = {}",
+        file.filename, file.size, file.offset
+    );
 
-            let mut data = read_bytes(&mut reader, file.size).expect("Failed to read data");
-            decode_data(&mut data, &keys.key1, &keys.key2);
+    ggpack
+        .reader
+        .seek(SeekFrom::Start(file.offset))
+        .expect("Failed to seek to offset");
 
-            if file.filename.ends_with(".json") {
-                let expanded = GGValue::parse(data).expect("Failed to expand .json");
+    let mut data = read_bytes(&mut ggpack.reader, file.size).expect("Failed to read data");
+    decode_data(&mut data, &ggpack.keys.key1, &ggpack.keys.key2);
 
-                std::fs::write(outpath + "/" + file.filename, serde_json::to_string_pretty(&expanded).unwrap())
-                    .expect("Failed to write data to disk");
-            } else {
-                std::fs::write(outpath + "/" + file.filename, data)
-                    .expect("Failed to write data to disk");
-            }
-        }
+    let final_path = format!("{}/{}", outpath, file.filename);
+
+    if file.filename.ends_with(".json") {
+        let expanded = GGValue::parse(data).expect("Failed to expand .json");
+
+        std::fs::write(final_path, serde_json::to_string_pretty(&expanded).unwrap())
+            .expect("Failed to write data to disk");
+    } else {
+        std::fs::write(final_path, data).expect("Failed to write data to disk");
+    }
+}
+
+fn main() {
+    let args = Args::parse();
+    match args {
+        Args::ExtractKeys { exe_path } => extract_keys(&exe_path),
+        Args::ListFiles { pack_path } => list_files(&pack_path),
+        Args::ExtractFile {
+            pack_path,
+            filename,
+            outpath,
+        } => extract_file(&pack_path, &filename, &outpath),
     }
 }
