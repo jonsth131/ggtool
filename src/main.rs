@@ -1,8 +1,45 @@
-mod reader;
+mod directory;
+mod decoder;
 
-use reader::{read_metadata, read_root};
+use std::{fs::File, path::Path, io::{BufReader, Read, Seek, SeekFrom, Cursor}};
 
-fn main() {
+use byteorder::{ReadBytesExt, LittleEndian};
+
+pub fn open_file(file_name: &str) -> BufReader<File> {
+    let file = File::open(&Path::new(file_name)).unwrap();
+    let reader = BufReader::new(file);    
+    return reader;
+}
+
+fn read_bytes(reader: &mut BufReader<File>, count: usize) -> Result<Vec<u8>, std::io::Error> {
+    let mut buffer = vec![0; count];
+    reader.read_exact(&mut buffer)?;
+    Ok(buffer)
+}
+
+fn read_file(file_name: &str, size: usize) -> Result<Vec<u8>, std::io::Error> {
+    let mut reader = open_file(file_name);
+    read_bytes(&mut reader, size)
+}
+
+pub fn read_root(file_name: &str) -> Result<Vec<u8>, std::io::Error> {
+    let key1 = read_file("keys/key1.bin", 65536)?;
+    let key2 = read_file("keys/key2.bin", 256)?;
+
+
+    let mut reader = open_file(file_name);
+    let offset = reader.read_u32::<LittleEndian>().unwrap();
+    let size = reader.read_u32::<LittleEndian>().unwrap();
+    reader.seek(SeekFrom::Start(offset as u64))?;
+
+    let mut data = read_bytes(&mut reader, size as usize)?;
+    
+    decoder::decode_data(&mut data, &key1, &key2);
+
+    Ok(data)
+}
+
+fn main() -> Result<(), std::io::Error> {
     let args: Vec<String> = std::env::args().collect();
     if args.len() < 2 {
         eprintln!("usage: ggtool <pack-file>");
@@ -11,11 +48,11 @@ fn main() {
 
     let pack_path = &args[1];
 
-    let data = read_root(&pack_path);
-    // std::fs::write("out/blah.bin", &data).unwrap();
+    let data = read_root(&pack_path)?;
 
-    let metatable = read_metadata(&data).expect("Failed to parse file metadata");
-    for file in metatable {
-        println!("{}", file);
-    }
+    let mut reader = Cursor::new(data);
+    let dict = directory::read_directory(&mut reader)?;
+    println!("{:#?}", dict);
+
+    Ok(())
 }
