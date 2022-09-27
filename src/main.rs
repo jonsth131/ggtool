@@ -4,37 +4,31 @@ mod easy_br;
 use clap::{Parser, Subcommand};
 mod keys;
 use easy_br::EasyRead;
+use keys::Keys;
 use std::{
     fs::File,
     io::{BufReader, Read, Seek, SeekFrom},
     path::Path,
 };
 
-fn open_file(file_name: &str) -> BufReader<File> {
-    let file = File::open(&Path::new(file_name)).unwrap();
-    let reader = BufReader::new(file);
-    return reader;
+use crate::decoder::decode_data;
+
+pub fn decode_at(
+    reader: &mut BufReader<File>,
+    keys: &Keys,
+    offset: u64,
+    size: usize,
+) -> Result<Vec<u8>, std::io::Error> {
+    reader.seek(SeekFrom::Start(offset))?;
+    let mut data = read_bytes(reader, size)?;
+    decoder::decode_data(&mut data, &keys.key1, &keys.key2);
+    Ok(data)
 }
 
 fn read_bytes(reader: &mut BufReader<File>, count: usize) -> Result<Vec<u8>, std::io::Error> {
     let mut buffer = vec![0; count];
     reader.read_exact(&mut buffer)?;
     Ok(buffer)
-}
-
-fn read_root(exe_path: &str, file_name: &str) -> Result<Vec<u8>, std::io::Error> {
-    let keys = keys::read_keys(exe_path)?;
-
-    let mut reader = open_file(file_name);
-    let offset = reader.read_u32_le()?;
-    let size = reader.read_u32_le()?;
-    reader.seek(SeekFrom::Start(offset as u64))?;
-
-    let mut data = read_bytes(&mut reader, size as usize)?;
-
-    decoder::decode_data(&mut data, &keys.key1, &keys.key2);
-
-    Ok(data)
 }
 
 /// Return to Monkey Island ggpack tool
@@ -61,14 +55,25 @@ enum Commands {
     ExtractFile {
         // Name of the file to extract
         filename: String,
+        // Output path
+        outpath: String
     },
 }
 
 fn main() {
     let args = Args::parse();
+    let keys = keys::read_keys(&args.exe_path).expect("Failed to extract keys from exe file");
 
-    let directory_data = read_root(&args.exe_path, &args.pack_path).expect("Failed to read directory data");
+    let file = File::open(&Path::new(&args.pack_path)).unwrap();
+    let mut reader = BufReader::new(file);
 
+    let offset = reader
+        .read_u32_le()
+        .expect("Failed to read directory offset") as u64;
+    let size = reader.read_u32_le().expect("Failed to read directory size") as usize;
+
+    let directory_data =
+        decode_at(&mut reader, &keys, offset, size).expect("Failed to decode directory");
     let directory = directory::Directory::parse(directory_data).expect("Failed to parse directory");
 
     let file_list = directory.get_files();
@@ -79,18 +84,24 @@ fn main() {
 
             println!("{:#?}", filenames);
         }
-        Commands::ExtractFile { filename } => {
+        Commands::ExtractFile { filename, outpath } => {
             let file = file_list
                 .iter()
                 .find(|f| f.filename.eq(&filename))
                 .expect("File not found in ggpack");
 
-            // TODO!
-
             println!(
                 "Extracting {}. Size = {}, offset = {}",
                 file.filename, file.size, file.offset
             );
+
+            reader
+                .seek(SeekFrom::Start(file.offset))
+                .expect("Failed to seek to offset");
+            let mut data = read_bytes(&mut reader, file.size).expect("Failed to read data");
+            decode_data(&mut data, &keys.key1, &keys.key2);
+
+            std::fs::write(outpath + "/" + file.filename, data).expect("Failed to write data to disk");
         }
     }
 }

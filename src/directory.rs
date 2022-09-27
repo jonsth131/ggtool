@@ -140,8 +140,8 @@ pub struct Directory {
 #[derive(Debug)]
 pub struct File<'a> {
     pub filename: &'a String,
-    pub size: &'a u32,
-    pub offset: &'a u32
+    pub size: usize,
+    pub offset: u64
 }
 
 impl Directory {
@@ -195,8 +195,8 @@ impl Directory {
                     .expect("filename entry not found!")
                     .expect_string();
 
-                let offset = entry_dict.get("offset").expect("offset entry not found!").expect_int();
-                let size = entry_dict.get("size").expect("size entry not found!").expect_int();
+                let offset = *entry_dict.get("offset").expect("offset entry not found!").expect_int() as u64;
+                let size = *entry_dict.get("size").expect("size entry not found!").expect_int() as usize;
                 File {
                     filename, 
                     offset, 
