@@ -1,7 +1,9 @@
-use byteorder::ReadBytesExt;
-use std::{collections::HashMap, io::{Cursor, SeekFrom}};
-
 use crate::easy_br::EasyRead;
+use byteorder::ReadBytesExt;
+use std::{
+    collections::HashMap,
+    io::{Cursor, SeekFrom},
+};
 
 pub enum GGValueType {
     Dictionary = 2,
@@ -22,6 +24,8 @@ impl From<u8> for GGValueType {
     }
 }
 
+type IOResult<T> = Result<T, std::io::Error>;
+
 #[derive(Debug)]
 pub enum GGValue {
     GGDict(HashMap<String, GGValue>),
@@ -30,108 +34,175 @@ pub enum GGValue {
     GGInt(u32),
 }
 
-type GGOffsets = Vec<u32>;
-
-fn read_table_entry(
-    reader: &mut Cursor<Vec<u8>>,
-    offsets: &GGOffsets,
-) -> Result<String, std::io::Error> {
-    let offset = reader.read_u16_le()? as usize;
-
-    let str = reader.read_at(SeekFrom::Start(offsets[offset] as u64), |reader| {
-        reader.read_cstring()
-    })?;
-
-    Ok(str)
-}
-
-fn read_dict(reader: &mut Cursor<Vec<u8>>, offsets: &GGOffsets) -> Result<GGValue, std::io::Error> {
-    let mut dict = HashMap::new();
-    let len = reader.read_u32_le()?;
-    for _ in 0..len {
-        let key = read_table_entry(reader, offsets)?;
-        let value = read_ggvalue(reader, offsets)?;
-        let _ = dict.insert(key, value);
+impl GGValue {
+    pub fn expect_dict(&self) -> &HashMap<String, GGValue> {
+        match self {
+            GGValue::GGDict(d) => d,
+            _ => panic!("Expected dict"),
+        }
     }
-
-    let end_marker = reader.read_u8()?;
-    assert!(end_marker == (GGValueType::Dictionary as u8));
-
-    Ok(GGValue::GGDict(dict))
-}
-
-fn read_list(reader: &mut Cursor<Vec<u8>>, offsets: &GGOffsets) -> Result<GGValue, std::io::Error> {
-    let mut list = Vec::new();
-    let len = reader.read_u32_le()?;
-    for _ in 0..len {
-        let value = read_ggvalue(reader, offsets)?;
-        list.push(value);
+    pub fn expect_list(&self) -> &Vec<GGValue> {
+        match self {
+            GGValue::GGList(l) => l,
+            _ => panic!("Expected list"),
+        }
     }
-
-    let end_marker = reader.read_u8()?;
-    assert!(end_marker == (GGValueType::List as u8));
-
-    Ok(GGValue::GGList(list))
-}
-
-fn read_string(
-    reader: &mut Cursor<Vec<u8>>,
-    offsets: &GGOffsets,
-) -> Result<GGValue, std::io::Error> {
-    let entry = read_table_entry(reader, offsets)?;
-    Ok(GGValue::GGString(entry))
-}
-
-fn read_integer(
-    reader: &mut Cursor<Vec<u8>>,
-    offsets: &GGOffsets,
-) -> Result<GGValue, std::io::Error> {
-    let entry = read_table_entry(reader, offsets)?;
-    let num: u32 = entry
-        .parse()
-        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
-
-    Ok(GGValue::GGInt(num))
-}
-
-fn read_ggvalue(
-    reader: &mut Cursor<Vec<u8>>,
-    offsets: &GGOffsets,
-) -> Result<GGValue, std::io::Error> {
-    let type_: GGValueType = reader.read_u8()?.into();
-    match type_ {
-        GGValueType::Dictionary => read_dict(reader, offsets),
-        GGValueType::List => read_list(reader, offsets),
-        GGValueType::String => read_string(reader, offsets),
-        GGValueType::Integer => read_integer(reader, offsets),
+    pub fn expect_string(&self) -> &String {
+        match self {
+            GGValue::GGString(s) => s,
+            _ => panic!("Expected string"),
+        }
+    }
+    pub fn expect_int(&self) -> &u32 {
+        match self {
+            GGValue::GGInt(i) => i,
+            _ => panic!("Expected int"),
+        }
     }
 }
 
-pub fn read_directory(reader: &mut Cursor<Vec<u8>>) -> Result<GGValue, std::io::Error> {
-    let magic = reader.read_u32_le()?;
-    assert!(magic == 0x04030201, "Magic must be 01 02 03 04");
+struct DirectoryBuilder {
+    reader: Cursor<Vec<u8>>,
+    offsets: Vec<u32>,
+}
 
-    let _num_tables = reader.read_u32_le()?; // Skip for now
+impl DirectoryBuilder {
+    fn read_table_entry(&mut self) -> IOResult<String> {
+        let offset = self.reader.read_u16_le()? as usize;
 
-    let offset_to_table = reader.read_u32_le()? as usize;
+        let str = self
+            .reader
+            .read_at(SeekFrom::Start(self.offsets[offset] as u64), |reader| {
+                reader.read_cstring()
+            })?;
 
-    let offsets = reader.read_at(SeekFrom::Start(offset_to_table as u64), |reader| {
-        // This may be cheating but let's just do it for now
-        let table_type = reader.read_u8()?;
-        assert!(table_type == 7);
+        Ok(str)
+    }
 
-        let mut offsets = Vec::new();
-        loop {
-            let offset = reader.read_u32_le()?;
-            if offset == 0xFF_FF_FF_FF {
-                break;
-            }
-
-            offsets.push(offset);
+    fn read_dict(&mut self) -> IOResult<GGValue> {
+        let mut dict = HashMap::new();
+        let len = self.reader.read_u32_le()?;
+        for _ in 0..len {
+            let key = self.read_table_entry()?;
+            let value = self.read_ggvalue()?;
+            let _ = dict.insert(key, value);
         }
 
-        Ok(offsets)
-    })?;
+        let end_marker = self.reader.read_u8()?;
+        assert!(end_marker == (GGValueType::Dictionary as u8));
 
-    read_ggvalue(reader, &offsets)
+        Ok(GGValue::GGDict(dict))
+    }
+
+    fn read_list(&mut self) -> IOResult<GGValue> {
+        let mut list = Vec::new();
+        let len = self.reader.read_u32_le()?;
+        for _ in 0..len {
+            let value = self.read_ggvalue()?;
+            list.push(value);
+        }
+
+        let end_marker = self.reader.read_u8()?;
+        assert!(end_marker == (GGValueType::List as u8));
+
+        Ok(GGValue::GGList(list))
+    }
+
+    fn read_string(&mut self) -> IOResult<GGValue> {
+        let entry = self.read_table_entry()?;
+        Ok(GGValue::GGString(entry))
+    }
+
+    fn read_integer(&mut self) -> IOResult<GGValue> {
+        let entry = self.read_table_entry()?;
+        let num: u32 = entry
+            .parse()
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+        Ok(GGValue::GGInt(num))
+    }
+
+    fn read_ggvalue(&mut self) -> IOResult<GGValue> {
+        let type_: GGValueType = self.reader.read_u8()?.into();
+        match type_ {
+            GGValueType::Dictionary => self.read_dict(),
+            GGValueType::List => self.read_list(),
+            GGValueType::String => self.read_string(),
+            GGValueType::Integer => self.read_integer(),
+        }
+    }
+}
+
+pub struct Directory {
+    root: GGValue,
+}
+
+#[derive(Debug)]
+pub struct File<'a> {
+    pub filename: &'a String,
+    pub size: &'a u32,
+    pub offset: &'a u32
+}
+
+impl Directory {
+    pub fn parse(data: Vec<u8>) -> IOResult<Directory> {
+        let mut reader = Cursor::new(data);
+
+        let magic = reader.read_u32_le()?;
+        assert!(magic == 0x04030201, "Magic must be 01 02 03 04");
+
+        let _num_tables = reader.read_u32_le()?; // Skip for now
+
+        let offset_to_table = reader.read_u32_le()? as u64;
+
+        let offsets = reader.read_at(SeekFrom::Start(offset_to_table), |reader| {
+            // This may be cheating but let's just do it for now
+            let table_type = reader.read_u8()?;
+            assert!(table_type == 7);
+
+            let mut offsets = Vec::new();
+            loop {
+                let offset = reader.read_u32_le()?;
+                if offset == 0xFF_FF_FF_FF {
+                    break;
+                }
+
+                offsets.push(offset);
+            }
+
+            Ok(offsets)
+        })?;
+
+        let mut directory_builder = DirectoryBuilder { reader, offsets };
+        Ok(Self {
+            root: directory_builder.read_ggvalue()?,
+        })
+    }
+
+    pub fn get_files<'a>(&'a self) -> Vec<File<'a>> {
+        let rootdict = self.root.expect_dict();
+
+        rootdict
+            .get("files")
+            .expect("files entry not found!")
+            .expect_list()
+            .iter()
+            .map(|entry| {
+                let entry_dict = entry.expect_dict();
+
+                let filename = entry_dict
+                    .get("filename")
+                    .expect("filename entry not found!")
+                    .expect_string();
+
+                let offset = entry_dict.get("offset").expect("offset entry not found!").expect_int();
+                let size = entry_dict.get("size").expect("size entry not found!").expect_int();
+                File {
+                    filename, 
+                    offset, 
+                    size
+                }
+            })
+            .collect()        
+    }
 }

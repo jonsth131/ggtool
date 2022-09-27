@@ -30,6 +30,6 @@ pub trait EasyRead: ReadBytesExt + BufRead + Seek {
         }
 }
 
-/// All types that implement `Read` and `BufRead` get methods defined in `EasyRead`
+/// All types that implement `Read`, `BufRead` and `Seek` get methods defined in `EasyRead`
 /// for free.
 impl<R: std::io::Read + BufRead + Seek + ?Sized> EasyRead for R {}
