@@ -1,2 +1,2 @@
 # ggtool
-Tools for ggpack
+Tools for ggpack used in Return to Monkey Island.
