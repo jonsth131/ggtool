@@ -1,10 +1,13 @@
-mod directory;
 mod decoder;
-use std::{io::{BufReader, Seek, SeekFrom, Read}, fs::File, path::Path};
-use crate::{keys::Keys, easy_br::EasyRead};
-use self::directory::GGValue;
+mod directory;
 use self::decoder::{decode_data, decode_yack_data};
-
+use self::directory::GGValue;
+use crate::{easy_br::EasyRead, keys::Keys};
+use std::{
+    fs::File,
+    io::{BufReader, Read, Seek, SeekFrom},
+    path::Path,
+};
 
 struct OpenGGPack {
     reader: BufReader<File>,
@@ -80,7 +83,9 @@ pub fn extract_file(pack_path: &str, filename: &str, outpath: &str) {
 
     let mut data = read_bytes(&mut ggpack.reader, file.size).expect("Failed to read data");
 
-    decode_data(&mut data, &ggpack.keys.key1, &ggpack.keys.key2);
+    if file.filename.ends_with(".bank") == false {
+        decode_data(&mut data, &ggpack.keys.key1, &ggpack.keys.key2);
+    }
 
     if file.filename.ends_with(".yack") {
         decode_yack_data(&mut data, &ggpack.keys.key3, &file.filename);
