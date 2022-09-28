@@ -1,5 +1,8 @@
+# libdinky
+Parses data files used in Return to Monkey Island.
+
 # ggtool
-Tools for ggpack files used in Return to Monkey Island.
+Command-line tool for unpacking *.ggpack-files used in Return to Monkey Island.
 
 # Usage
 ```
