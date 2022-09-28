@@ -11,7 +11,13 @@ enum YackOpcode {
     EmitCode = 8,
     DefineLabel = 9,
     GotoLabel = 10,
-    ChooseReply = 100,
+    EndChoices = 11,
+    StartChoices = 12,
+    Reply1 = 100,
+    Reply2 = 101,
+    Reply3 = 102,
+    Reply4 = 103,
+    Reply5 = 104,
     Unknown,
 }
 impl From<u8> for YackOpcode {
@@ -22,7 +28,13 @@ impl From<u8> for YackOpcode {
             8 => Self::EmitCode,
             9 => Self::DefineLabel,
             10 => Self::GotoLabel,
-            100 => Self::ChooseReply,
+            11 => Self::EndChoices,
+            12 => Self::StartChoices,
+            100 => Self::Reply1,
+            101 => Self::Reply2,
+            102 => Self::Reply3,
+            103 => Self::Reply4,
+            104 => Self::Reply5,
             _ => Self::Unknown,
         }
     }
@@ -65,8 +77,11 @@ pub fn parse_yack(data: &Vec<u8>) -> Result<Vec<String>, std::io::Error> {
             conditions.push(string_table[condition_index as usize].clone());
         }
 
-        let arg_indices = [reader.read_i32::<LittleEndian>()?, reader.read_i32::<LittleEndian>()?];        
-        
+        let arg_indices = [
+            reader.read_i32::<LittleEndian>()?,
+            reader.read_i32::<LittleEndian>()?,
+        ];
+
         let get_arg = |index| {
             let str_index = arg_indices[index];
             if str_index == -1 {
@@ -84,20 +99,35 @@ pub fn parse_yack(data: &Vec<u8>) -> Result<Vec<String>, std::io::Error> {
         let emit_code = || get_arg(0).expect("Expected arg 0");
         let define_label = || format!("\n=== {} ===", get_arg(0).expect("Expected arg 0"));
         let goto_state = || format!("-> {}", get_arg(0).expect("Expected arg 0"));
-        let choose_reply = || {
+        let choose_reply = |x: u8| {
             format!(
-                "choice {} then goto {}",
-                get_arg(0).expect("Expected arg 0"), get_arg(1).expect("Expected arg 1")
+                "{} SAY({}) -> {}",
+                x,
+                get_arg(0).expect("Expected arg 0"),
+                get_arg(1).expect("Expected arg 1")
             )
         };
+        let end_choices = || format!("End choices");
+        let start_choices = || format!("Start choices");
 
         let opcode_line = match opcode {
             YackOpcode::ActorSay => actor_say(),
             YackOpcode::EmitCode => emit_code(),
             YackOpcode::DefineLabel => define_label(),
             YackOpcode::GotoLabel => goto_state(),
-            YackOpcode::ChooseReply => choose_reply(),
-            YackOpcode::Unknown => format!("??Unknown opcode {} arg1={:?} arg2={:?}", raw_opcode, get_arg(0), get_arg(1)),
+            YackOpcode::EndChoices => end_choices(),
+            YackOpcode::StartChoices => start_choices(),
+            YackOpcode::Reply1 => choose_reply(1),
+            YackOpcode::Reply2 => choose_reply(2),
+            YackOpcode::Reply3 => choose_reply(3),
+            YackOpcode::Reply4 => choose_reply(4),
+            YackOpcode::Reply5 => choose_reply(5),
+            YackOpcode::Unknown => format!(
+                "??Unknown opcode {} arg1={:?} arg2={:?}",
+                raw_opcode,
+                get_arg(0),
+                get_arg(1)
+            ),
             YackOpcode::End => "end.".to_string(),
         };
 
