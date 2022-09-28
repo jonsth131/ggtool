@@ -2,7 +2,7 @@ use crate::{
     decoder::{self, decode_data, decode_yack_data},
     directory::GGValue,
     easy_br::EasyRead,
-    keys::Keys,
+    keys::Keys, yack::parse_yack,
 };
 use std::{
     fs::File,
@@ -74,6 +74,10 @@ impl OpenGGPack {
 
         if file.filename.ends_with(".yack") {
             decode_yack_data(&mut data, &self.keys.key3, &file.filename);
+            let yack_lines = parse_yack(&data).expect("Failed to parse yack data");
+            for line in yack_lines {
+                println!("{}", line);   
+            }
         }
 
         let final_path = format!("{}/{}", outpath, file.filename);
