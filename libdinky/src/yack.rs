@@ -12,7 +12,7 @@ enum YackOpcode {
     DefineLabel = 9,
     GotoLabel = 10,
     ChooseReply = 100,
-    Unknown
+    Unknown,
 }
 impl From<u8> for YackOpcode {
     fn from(what: u8) -> Self {
@@ -71,36 +71,31 @@ pub fn parse_yack(data: &Vec<u8>) -> Result<Vec<String>, std::io::Error> {
         let actor_say = || {
             let talker = string_table[arg1_index as usize].clone();
             let what = string_table[arg2_index as usize].clone();
-            format!("\t{}: {}", talker, what)
+            format!("{}: {}", talker, what)
         };
-        let emit_code = || {
-            string_table[arg1_index as usize]
-                .lines()
-                .map(|l| format!("\t{}\n", l))
-                .collect()
-        };
-        let define_label = || format!("\nlabel {}:", string_table[arg1_index as usize]);
-        let goto_state = || format!("\tgoto {}", string_table[arg1_index as usize]);
+        let emit_code = || string_table[arg1_index as usize].clone();
+        let define_label = || format!("\n=== {} ===", string_table[arg1_index as usize]);
+        let goto_state = || format!("-> {}", string_table[arg1_index as usize]);
         let choose_reply = || {
             format!(
-                "\tchoice {} then goto {}",
+                "choice {} then goto {}",
                 string_table[arg1_index as usize], string_table[arg2_index as usize]
             )
         };
-		
+
         let opcode_line = match opcode {
             YackOpcode::ActorSay => actor_say(),
             YackOpcode::EmitCode => emit_code(),
             YackOpcode::DefineLabel => define_label(),
             YackOpcode::GotoLabel => goto_state(),
             YackOpcode::ChooseReply => choose_reply(),
-            YackOpcode::Unknown => format!("\t??Unknown opcode {}", raw_opcode),
+            YackOpcode::Unknown => format!("??Unknown opcode {}", raw_opcode),
             YackOpcode::End => "end.".to_string(),
         };
 
         let and_conditions = conditions.join(" && ");
         if conditions.len() > 0 {
-            lines.push(format!("\tif {} then {}", &and_conditions, opcode_line));
+            lines.push(format!("if {} then {}", &and_conditions, opcode_line));
         } else {
             lines.push(opcode_line);
         };
