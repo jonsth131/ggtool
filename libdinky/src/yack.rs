@@ -65,21 +65,29 @@ pub fn parse_yack(data: &Vec<u8>) -> Result<Vec<String>, std::io::Error> {
             conditions.push(string_table[condition_index as usize].clone());
         }
 
-        let arg1_index = reader.read_i32::<LittleEndian>()?;
-        let arg2_index = reader.read_i32::<LittleEndian>()?;
+        let arg_indices = [reader.read_i32::<LittleEndian>()?, reader.read_i32::<LittleEndian>()?];        
+        
+        let get_arg = |index| {
+            let str_index = arg_indices[index];
+            if str_index == -1 {
+                None
+            } else {
+                Some(string_table[str_index as usize].clone())
+            }
+        };
 
         let actor_say = || {
-            let talker = string_table[arg1_index as usize].clone();
-            let what = string_table[arg2_index as usize].clone();
+            let talker = get_arg(0).expect("Expected arg 0");
+            let what = get_arg(1).expect("Expected arg 1");
             format!("{}: {}", talker, what)
         };
-        let emit_code = || string_table[arg1_index as usize].clone();
-        let define_label = || format!("\n=== {} ===", string_table[arg1_index as usize]);
-        let goto_state = || format!("-> {}", string_table[arg1_index as usize]);
+        let emit_code = || get_arg(0).expect("Expected arg 0");
+        let define_label = || format!("\n=== {} ===", get_arg(0).expect("Expected arg 0"));
+        let goto_state = || format!("-> {}", get_arg(0).expect("Expected arg 0"));
         let choose_reply = || {
             format!(
                 "choice {} then goto {}",
-                string_table[arg1_index as usize], string_table[arg2_index as usize]
+                get_arg(0).expect("Expected arg 0"), get_arg(1).expect("Expected arg 1")
             )
         };
 
@@ -89,7 +97,7 @@ pub fn parse_yack(data: &Vec<u8>) -> Result<Vec<String>, std::io::Error> {
             YackOpcode::DefineLabel => define_label(),
             YackOpcode::GotoLabel => goto_state(),
             YackOpcode::ChooseReply => choose_reply(),
-            YackOpcode::Unknown => format!("??Unknown opcode {}", raw_opcode),
+            YackOpcode::Unknown => format!("??Unknown opcode {} arg1={:?} arg2={:?}", raw_opcode, get_arg(0), get_arg(1)),
             YackOpcode::End => "end.".to_string(),
         };
 
