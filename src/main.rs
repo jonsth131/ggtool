@@ -1,6 +1,8 @@
 mod decoder;
 mod directory;
 mod easy_br;
+mod yack;
+mod dink;
 use clap::Parser;
 mod keys;
 use easy_br::EasyRead;
@@ -13,7 +15,7 @@ use std::{
 
 use crate::{
     decoder::{decode_data, decode_yack_data},
-    directory::GGValue,
+    directory::GGValue, yack::parse_yack,
 };
 
 pub fn decode_at(
@@ -128,6 +130,11 @@ fn extract_file(pack_path: &str, filename: &str, outpath: &str) {
 
     if file.filename.ends_with(".yack") {
         decode_yack_data(&mut data, &ggpack.keys.key3, &file.filename);
+        let yack = parse_yack(&data).expect("Failed to parse yack");
+        for line in yack {
+            println!("{}", line);
+        }
+        return;
     }
 
     let final_path = format!("{}/{}", outpath, file.filename);
