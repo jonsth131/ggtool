@@ -21,13 +21,21 @@ pub trait EasyRead: ReadBytesExt + BufRead + Seek {
     }
 
     fn read_at<F, T>(&mut self, seek: SeekFrom, f: F) -> Result<T, std::io::Error>
-        where F: Fn(&mut Self) -> Result<T, std::io::Error> {
-            let tell = self.seek(SeekFrom::Current(0))?;
-            self.seek(seek)?;
-            let res = f(self)?;
-            self.seek(SeekFrom::Start(tell))?;
-            Ok(res)
-        }
+    where
+        F: Fn(&mut Self) -> Result<T, std::io::Error>,
+    {
+        let tell = self.seek(SeekFrom::Current(0))?;
+        self.seek(seek)?;
+        let res = f(self)?;
+        self.seek(SeekFrom::Start(tell))?;
+        Ok(res)
+    }
+
+    fn read_bytes(&mut self, count: usize) -> Result<Vec<u8>, std::io::Error> {
+        let mut buffer = vec![0; count];
+        self.read_exact(&mut buffer)?;
+        Ok(buffer)
+    }
 }
 
 /// All types that implement `Read`, `BufRead` and `Seek` get methods defined in `EasyRead`

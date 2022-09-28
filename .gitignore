@@ -12,3 +12,4 @@ Cargo.lock
 files/
 keys/
 out/
+.vs/
