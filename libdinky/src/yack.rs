@@ -8,6 +8,9 @@ use crate::easy_br::EasyRead;
 enum YackOpcode {
     End = 0,
     ActorSay = 1,
+    Assign = 2,
+    Pause = 5,
+    WaitFor = 7,
     EmitCode = 8,
     DefineLabel = 9,
     GotoLabel = 10,
@@ -29,6 +32,9 @@ impl From<u8> for YackOpcode {
         match what {
             0 => Self::End,
             1 => Self::ActorSay,
+            2 => Self::Assign,
+            5 => Self::Pause,
+            7 => Self::WaitFor,
             8 => Self::EmitCode,
             9 => Self::DefineLabel,
             10 => Self::GotoLabel,
@@ -102,9 +108,17 @@ pub fn parse_yack(data: &Vec<u8>) -> Result<Vec<String>, std::io::Error> {
         let actor_say = || {
             let talker = get_arg(0).expect("Expected arg 0");
             let what = get_arg(1).expect("Expected arg 1");
-            format!("{}: {}", talker, what)
+            format!("{}: SAY({})", talker, what)
         };
-        let emit_code = || get_arg(0).expect("Expected arg 0");
+        let emit_code = || {
+            let arg = get_arg(0).expect("Expected arg 0");
+            if arg.contains("\n") {
+                let code = str::replace(&arg, "\n", "\n\t");
+                return format!("{{\n\t{}\n}}", code);
+            } else {
+                return format!("{{{}}}", arg);
+            }
+        };
         let define_label = || format!("\n=== {} ===", get_arg(0).expect("Expected arg 0"));
         let goto_state = || format!("-> {}", get_arg(0).expect("Expected arg 0"));
         let choose_reply = |x: u8| {
@@ -117,10 +131,22 @@ pub fn parse_yack(data: &Vec<u8>) -> Result<Vec<String>, std::io::Error> {
         };
         let end_choices = || format!("End choices");
         let start_choices = || format!("Start choices");
+        let pause = || format!("pause {}", get_arg(0).expect("Expected arg 0"));
+        let wait_for = || format!("waitfor {}", get_arg(0).expect("Expected arg 0"));
+        let assign = || {
+            format!(
+                "{} <- {}",
+                get_arg(0).expect("Expected arg 0"),
+                get_arg(1).expect("Expected arg 1")
+            )
+        };
 
         let opcode_line = match opcode {
             YackOpcode::ActorSay => actor_say(),
+            YackOpcode::Assign => assign(),
             YackOpcode::EmitCode => emit_code(),
+            YackOpcode::Pause => pause(),
+            YackOpcode::WaitFor => wait_for(),
             YackOpcode::DefineLabel => define_label(),
             YackOpcode::GotoLabel => goto_state(),
             YackOpcode::EndChoices => end_choices(),
