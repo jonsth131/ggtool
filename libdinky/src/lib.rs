@@ -1,4 +1,5 @@
 mod easy_br;
+mod ktx_decompress;
 
 pub mod decoder;
 pub mod dink;

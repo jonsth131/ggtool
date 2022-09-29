@@ -2,7 +2,9 @@ use crate::{
     decoder::{self, decode_data, decode_yack_data},
     directory::GGValue,
     easy_br::EasyRead,
-    keys::Keys, yack::parse_yack,
+    keys::Keys,
+    ktx_decompress,
+    yack::parse_yack,
 };
 use std::{
     fs::File,
@@ -76,7 +78,7 @@ impl OpenGGPack {
             decode_yack_data(&mut data, &self.keys.key3, &file.filename);
             let yack_lines = parse_yack(&data).expect("Failed to parse yack data");
             for line in yack_lines {
-                println!("{}", line);   
+                println!("{}", line);
             }
         }
 
@@ -90,7 +92,12 @@ impl OpenGGPack {
         } else if file.filename.ends_with(".ktxbz") || file.filename.ends_with(".ktxaz") {
             let decompressed =
                 inflate::inflate_bytes_zlib(&data).expect("Failed to inflate compressed data");
-            std::fs::write(final_path, decompressed).expect("Failed to write data to disk");
+
+            let mut output_buffer: Vec<u8> = Vec::new();
+            ktx_decompress::decompress_gl::decompress_bptc(&decompressed, &mut output_buffer);
+
+            std::fs::write(format!("{}.png", final_path), output_buffer)
+                .expect("Failed to write data to disk");
         } else {
             std::fs::write(final_path, data).expect("Failed to write data to disk");
         }
