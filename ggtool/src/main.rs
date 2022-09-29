@@ -29,6 +29,9 @@ enum Args {
 fn extract_keys(exe_path: &str) {
     let keys =
         libdinky::Keys::extract_from_exe(exe_path).expect("Failed to extract keys from exe file");
+    if !std::path::Path::new("keys").exists() {
+        std::fs::create_dir("keys").expect("Failed to create dir 'keys'");
+    }
     std::fs::write("keys/key1.bin", keys.key1).expect("Failed to write keys/key1.bin");
     std::fs::write("keys/key2.bin", keys.key2).expect("Failed to write keys/key2.bin");
     std::fs::write("keys/key3.bin", keys.key3).expect("Failed to write keys/key3.bin");
