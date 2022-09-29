@@ -8,3 +8,10 @@ pub mod yack;
 pub mod ggpack;
 
 pub use keys::Keys;
+
+#[cfg(feature = "decompress_ktx")]
+use surfman::declare_surfman;
+#[cfg(feature = "decompress_ktx")]
+declare_surfman!();
+#[cfg(feature = "decompress_ktx")]
+mod ktx_decompress;
