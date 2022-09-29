@@ -18,6 +18,10 @@ enum YackOpcode {
     Reply3 = 102,
     Reply4 = 103,
     Reply5 = 104,
+    Reply6 = 105,
+    Reply7 = 106,
+    Reply8 = 107,
+    Reply9 = 108,
     Unknown,
 }
 impl From<u8> for YackOpcode {
@@ -35,6 +39,10 @@ impl From<u8> for YackOpcode {
             102 => Self::Reply3,
             103 => Self::Reply4,
             104 => Self::Reply5,
+            105 => Self::Reply6,
+            106 => Self::Reply7,
+            107 => Self::Reply8,
+            108 => Self::Reply9,
             _ => Self::Unknown,
         }
     }
@@ -122,6 +130,10 @@ pub fn parse_yack(data: &Vec<u8>) -> Result<Vec<String>, std::io::Error> {
             YackOpcode::Reply3 => choose_reply(3),
             YackOpcode::Reply4 => choose_reply(4),
             YackOpcode::Reply5 => choose_reply(5),
+            YackOpcode::Reply6 => choose_reply(6),
+            YackOpcode::Reply7 => choose_reply(7),
+            YackOpcode::Reply8 => choose_reply(8),
+            YackOpcode::Reply9 => choose_reply(9),
             YackOpcode::Unknown => format!(
                 "??Unknown opcode {} arg1={:?} arg2={:?}",
                 raw_opcode,
