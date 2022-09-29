@@ -1,6 +1,20 @@
 # ggtool
 Command-line tool for unpacking *.ggpack-files used in Return to Monkey Island.
 
+# Building
+You need Rust edition 2021. The easiest way to install Rust is via rustup: https://rustup.rs/
+
+Once you have Rust installed, you can run the following command in the cloned folder to build an executable:
+```
+cargo build --release
+```
+
+libdinky includes a feature to decompress and convert KTX-textures to PNG. It can be enabled by building with
+```
+cargo build --release --features decompress_ktx
+```
+Whenever a *.ktxbz file is extracted, it is then also converted to PNG and saved alongside the extracted file.
+
 # Usage
 ```
 Return to Monkey Island ggpack tool
