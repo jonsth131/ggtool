@@ -3,9 +3,12 @@ use crate::{
     directory::GGValue,
     easy_br::EasyRead,
     keys::Keys,
-    ktx_decompress,
     yack::parse_yack,
 };
+
+#[cfg(feature = "decompress_ktx")]
+use crate::ktx_decompress;
+
 use std::{
     fs::File,
     io::{BufReader, Seek, SeekFrom},
@@ -83,7 +86,6 @@ impl OpenGGPack {
         }
 
         let final_path = format!("{}/{}", outpath, file.filename);
-
         if file.filename.ends_with(".json") || file.filename.ends_with(".wimpy") {
             let expanded = GGValue::parse(data).expect("Failed to expand file");
 
@@ -94,12 +96,16 @@ impl OpenGGPack {
             let decompressed =
                 inflate::inflate_bytes_zlib(&data).expect("Failed to inflate compressed data");
 
-            println!("Decompressing BPTC texture...");
-            let mut output_buffer: Vec<u8> = Vec::new();
-            ktx_decompress::decompress_gl::decompress_bptc(&decompressed, &mut output_buffer);
+            std::fs::write(&final_path, &decompressed).expect("Failed to write data to disk");
 
-            std::fs::write(format!("{}.png", final_path), output_buffer)
-                .expect("Failed to write data to disk");
+            #[cfg(feature = "decompress_ktx")]
+            {
+                println!("Decompressing BPTC texture...");
+                let mut output_buffer: Vec<u8> = Vec::new();
+                ktx_decompress::decompress_gl::decompress_bptc(&decompressed, &mut output_buffer);
+                std::fs::write(format!("{}.png", final_path), output_buffer)
+                    .expect("Failed to write data to disk");
+            }
         } else {
             std::fs::write(final_path, data).expect("Failed to write data to disk");
         }

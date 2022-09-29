@@ -20,7 +20,7 @@ pub fn decompress_bptc(data: &Vec<u8>, output_buffer: &mut Vec<u8>) {
 
     let context = device.create_context(&context_descriptor, None).expect("Failed to create surfman context");
     device.make_context_current(&context).expect("Failed to make GL context current");
-    
+
     gl::load_with(|s| device.get_proc_address(&context, s) as *const _);
 
     let cursor = std::io::Cursor::new(&data);
@@ -60,7 +60,7 @@ pub fn decompress_bptc(data: &Vec<u8>, output_buffer: &mut Vec<u8>) {
             target_texture.as_mut_ptr() as *mut c_void,
         );
     }
-
+        
     let mut encoder = png::Encoder::new(output_buffer, width, height);
     encoder.set_color(png::ColorType::Rgba);
     encoder.set_depth(png::BitDepth::Eight);
