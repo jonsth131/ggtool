@@ -71,12 +71,6 @@ impl Serialize for GGValue {
     }
 }
 
-#[derive(Debug)]
-pub struct File<'a> {
-    pub filename: &'a String,
-    pub size: usize,
-    pub offset: u64,
-}
 
 impl GGValue {
     pub fn expect_dict(&self) -> &HashMap<String, GGValue> {
@@ -102,39 +96,6 @@ impl GGValue {
             GGValue::GGNumber(f) => f,
             _ => panic!("Expected int"),
         }
-    }
-
-    pub fn get_files<'a>(&'a self) -> Vec<File<'a>> {
-        let rootdict = self.expect_dict();
-
-        rootdict
-            .get("files")
-            .expect("files entry not found!")
-            .expect_list()
-            .iter()
-            .map(|entry| {
-                let entry_dict = entry.expect_dict();
-
-                let filename = entry_dict
-                    .get("filename")
-                    .expect("filename entry not found!")
-                    .expect_string();
-
-                let offset = (*entry_dict
-                    .get("offset")
-                    .expect("offset entry not found!")
-                    .expect_number()) as u64;
-                let size = *entry_dict
-                    .get("size")
-                    .expect("size entry not found!")
-                    .expect_number() as usize;
-                File {
-                    filename,
-                    offset,
-                    size,
-                }
-            })
-            .collect()
     }
 
     pub fn parse(data: Vec<u8>) -> IOResult<Self> {

@@ -10,15 +10,21 @@ use crate::{
 use crate::ktx_decompress;
 
 use std::{
-    fs::File,
     io::{BufReader, Seek, SeekFrom},
-    path::Path,
+    path::Path, fs::File,
 };
 
 pub struct OpenGGPack {
     reader: BufReader<File>,
     directory: GGValue,
     keys: Keys,
+}
+
+#[derive(Debug)]
+pub struct GGFile {
+    pub filename: String,
+    pub size: usize,
+    pub offset: u64,
 }
 
 impl OpenGGPack {
@@ -44,15 +50,48 @@ impl OpenGGPack {
         })
     }
 
+    pub fn get_files(&self) -> Vec<GGFile> {
+        let rootdict = self.directory.expect_dict();
+
+        rootdict
+            .get("files")
+            .expect("files entry not found!")
+            .expect_list()
+            .iter()
+            .map(|entry| {
+                let entry_dict = entry.expect_dict();
+
+                let filename = entry_dict
+                    .get("filename")
+                    .expect("filename entry not found!")
+                    .expect_string();
+
+                let offset = (*entry_dict
+                    .get("offset")
+                    .expect("offset entry not found!")
+                    .expect_number()) as u64;
+                let size = *entry_dict
+                    .get("size")
+                    .expect("size entry not found!")
+                    .expect_number() as usize;
+                GGFile {
+                    filename: filename.clone(),
+                    offset,
+                    size,
+                }
+            })
+            .collect()
+    }
+
     pub fn list_files(&self) {
-        let file_list = self.directory.get_files();
-        let filenames: Vec<&String> = file_list.iter().map(|f| f.filename).collect();
+        let file_list = self.get_files();
+        let filenames: Vec<&String> = file_list.iter().map(|f| &f.filename).collect();
 
         println!("{}", serde_json::to_string_pretty(&filenames).unwrap());
     }
 
     pub fn extract_file(&mut self, filename: &str, outpath: &str) {
-        let file_list = self.directory.get_files();
+        let file_list = self.get_files();
 
         let file = file_list
             .iter()

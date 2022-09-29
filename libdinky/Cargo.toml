@@ -3,9 +3,13 @@ name = "libdinky"
 version = "0.1.0"
 edition = "2021"
 build = "build.rs"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/jonsth131/ggtool"
+keywords = ["ggpack", "Return to Monkey Island", "yack", "dinky", "wimpy"]
 
 [build-dependencies]
-gl_generator = "0.14.0"
+gl_generator = { version = "0.14.0", optional = true }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -19,4 +23,4 @@ png = { version = "0.17.6", optional = true}
 surfman = { version = "0.4.3", optional = true }
 
 [features]
-decompress_ktx = ["surfman", "png", "ktx"]
+decompress_ktx = ["surfman", "png", "ktx", "gl_generator"]
