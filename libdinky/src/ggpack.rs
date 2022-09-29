@@ -125,7 +125,7 @@ impl OpenGGPack {
         }
 
         let final_path = format!("{}/{}", outpath, file.filename);
-        if file.filename.ends_with(".json") || file.filename.ends_with(".wimpy") {
+        if file.filename.ends_with(".json") || file.filename.ends_with(".wimpy") || file.filename.ends_with(".emitter") {
             let expanded = GGValue::parse(data).expect("Failed to expand file");
 
             std::fs::write(final_path, serde_json::to_string_pretty(&expanded).unwrap())
