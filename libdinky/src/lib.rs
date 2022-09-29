@@ -9,3 +9,6 @@ pub mod yack;
 pub mod ggpack;
 
 pub use keys::Keys;
+use surfman::declare_surfman;
+
+declare_surfman!();

@@ -1,38 +1,34 @@
-use std::ffi::c_void;
-
-use glutin::dpi::PhysicalSize;
 use ktx::KtxInfo;
+use std::ffi::c_void;
+use surfman::{ContextAttributeFlags, ContextAttributes, GLVersion};
 mod gl {
     include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
 }
 
 pub fn decompress_bptc(data: &Vec<u8>, output_buffer: &mut Vec<u8>) {
-    let el = glutin::event_loop::EventLoop::new();
-    let context = glutin::ContextBuilder::new()
-        .build_headless(
-            &el,
-            PhysicalSize {
-                width: 800,
-                height: 600,
-            },
-        )
-        .unwrap();
+    let connection = surfman::Connection::new().expect("Failed to create surfman connection");
+    let adapter = connection.create_adapter().expect("Failed to create surfman adapter");
+    let mut device = connection.create_device(&adapter).expect("Failed to create surfman device");
 
-    let current = unsafe { context.make_current().unwrap() };
+    let context_attributes = ContextAttributes {
+        version: GLVersion::new(4, 6),
+        flags: ContextAttributeFlags::empty(),
+    };
+    let context_descriptor = device
+        .create_context_descriptor(&context_attributes)
+        .expect("Failed to create surfman context descriptor");
 
-    gl::load_with(|s| current.get_proc_address(s) as *const _);
+    let context = device.create_context(&context_descriptor, None).expect("Failed to create surfman context");
+    device.make_context_current(&context).expect("Failed to make GL context current");
+    
+    gl::load_with(|s| device.get_proc_address(&context, s) as *const _);
 
     let cursor = std::io::Cursor::new(&data);
     let decoder = ktx::Decoder::new(cursor).expect("Failed to create KTX decoder");
+
     let width = decoder.pixel_width();
     let height = decoder.pixel_height();
-    let depth = decoder.pixel_depth();
     let gl_internal_format = decoder.gl_internal_format();
-
-    println!(
-        "Image size {}x{}, depth {}, gl_internal_format {}",
-        width, height, depth, gl_internal_format
-    );
 
     let textures: Vec<Vec<u8>> = decoder.read_textures().take(1).collect();
     let texture = &textures[0];

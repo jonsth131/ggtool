@@ -90,9 +90,11 @@ impl OpenGGPack {
             std::fs::write(final_path, serde_json::to_string_pretty(&expanded).unwrap())
                 .expect("Failed to write data to disk");
         } else if file.filename.ends_with(".ktxbz") || file.filename.ends_with(".ktxaz") {
+            println!("Inflating...");
             let decompressed =
                 inflate::inflate_bytes_zlib(&data).expect("Failed to inflate compressed data");
 
+            println!("Decompressing BPTC texture...");
             let mut output_buffer: Vec<u8> = Vec::new();
             ktx_decompress::decompress_gl::decompress_bptc(&decompressed, &mut output_buffer);
 
