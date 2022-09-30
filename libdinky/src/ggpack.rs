@@ -97,6 +97,19 @@ impl OpenGGPack {
         let glob = Glob::new(pattern).unwrap();
         let file_list = self.get_files();
 
+        let mut matched_any = false;
+        for file in &file_list {
+            if glob.is_match(&file.filename[..]) {
+                matched_any = true;
+                self.extract_file(file, outpath, decompile_yacks);
+            }
+        }
+
+        if !matched_any {
+            println!("No files extracted. The provided pattern '{}' didn't match any files in the archive.", pattern);
+        }
+    }
+
     pub fn extract_file(&mut self, file: &GGFile, outpath: &str, decompile_yacks: bool) {
         println!(
             "Extracting {}. Size = {}, offset = {}",
@@ -124,8 +137,7 @@ impl OpenGGPack {
 
             std::fs::write(format!("{}.txt", final_path), outp)
                 .expect("Failed to write data to disk");
-        }
-        else if file.filename.ends_with(".json")
+        } else if file.filename.ends_with(".json")
             || file.filename.ends_with(".wimpy")
             || file.filename.ends_with(".emitter")
         {

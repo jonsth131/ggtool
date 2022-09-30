@@ -150,6 +150,22 @@ pub fn parse_yack(data: &Vec<u8>) -> Result<String, std::io::Error> {
                 let what = get_arg(1).expect("Expected arg 1");
                 emit(indentation_level, &format!("{talker}: SAY({what})\n"));
             }
+            YackOpcode::Assign => {
+                emit(
+                    indentation_level,
+                    &format!(
+                        "{} <- {}",
+                        get_arg(0).expect("Expected arg 0"),
+                        get_arg(1).expect("Expected arg 1")
+                    ),
+                );
+            }
+            YackOpcode::Pause => {
+                emit(
+                    indentation_level,
+                    &format!("pause {}", get_arg(0).expect("Expected arg 0")),
+                );
+            }
             YackOpcode::WaitFor => {
                 let actor = get_arg(0).expect("Expected arg 0");
                 emit(indentation_level, &format!("waitfor {actor}\n"));
