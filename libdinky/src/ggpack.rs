@@ -10,8 +10,9 @@ use crate::{
 use crate::ktx_decompress;
 
 use std::{
+    fs::File,
     io::{BufReader, Seek, SeekFrom},
-    path::Path, fs::File,
+    path::Path,
 };
 
 pub struct OpenGGPack {
@@ -125,28 +126,45 @@ impl OpenGGPack {
         }
 
         let final_path = format!("{}/{}", outpath, file.filename);
-        if file.filename.ends_with(".json") || file.filename.ends_with(".wimpy") || file.filename.ends_with(".emitter") {
+        if file.filename.ends_with(".json")
+            || file.filename.ends_with(".wimpy")
+            || file.filename.ends_with(".emitter")
+        {
             let expanded = GGValue::parse(data).expect("Failed to expand file");
 
             std::fs::write(final_path, serde_json::to_string_pretty(&expanded).unwrap())
                 .expect("Failed to write data to disk");
         } else if file.filename.ends_with(".ktxbz") || file.filename.ends_with(".ktxaz") {
-            println!("Inflating...");
-            let decompressed =
-                inflate::inflate_bytes_zlib(&data).expect("Failed to inflate compressed data");
-
-            std::fs::write(&final_path, &decompressed).expect("Failed to write data to disk");
-
-            #[cfg(feature = "decompress_ktx")]
-            {
-                println!("Decompressing BPTC texture...");
-                let mut output_buffer: Vec<u8> = Vec::new();
-                ktx_decompress::decompress_gl::decompress_bptc(&decompressed, &mut output_buffer);
-                std::fs::write(format!("{}.png", final_path), output_buffer)
-                    .expect("Failed to write data to disk");
-            }
+            Self::handle_ktxbz(&data, &final_path);
         } else {
             std::fs::write(final_path, data).expect("Failed to write data to disk");
+        }
+    }
+
+    fn handle_ktxbz(data: &Vec<u8>, final_path: &str) {
+        println!("Inflating...");
+        let decompressed = inflate::inflate_bytes_zlib(&data);
+
+        match decompressed {
+            Ok(v) => {
+                std::fs::write(&final_path, &v).expect("Failed to write data to disk");
+
+                #[cfg(feature = "decompress_ktx")]
+                {
+                    println!("Decompressing BPTC texture...");
+                    let mut output_buffer: Vec<u8> = Vec::new();
+                    ktx_decompress::decompress_gl::decompress_bptc(
+                        &decompressed,
+                        &mut output_buffer,
+                    );
+                    std::fs::write(format!("{}.png", final_path), output_buffer)
+                        .expect("Failed to write data to disk");
+                }
+            }
+            Err(e) => {
+                eprintln!("Error when inflating, {e:?}, saving raw data.");
+                std::fs::write(final_path, data).expect("Failed to write data to disk");
+            }
         }
     }
 }
