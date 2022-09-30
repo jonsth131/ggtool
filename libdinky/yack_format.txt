@@ -1,0 +1,72 @@
+enum YackOpcode {
+    End = 0,
+    ActorSay = 1,
+    EmitCode = 8,
+    DefineLabel = 9,
+    GotoLabel = 10,
+    EndChoices = 11,
+    StartChoices = 12,
+    Reply1 = 100,
+    Reply2 = 101,
+    Reply3 = 102,
+    Reply4 = 103,
+    Reply5 = 104,
+    Reply6 = 105,
+    Reply7 = 106,
+    Reply8 = 107,
+    Reply9 = 108,
+    Unknown,
+}
+
+
+Opcode 0 "End":
+    We're done
+
+Opcode 1 "Say":
+    talker: arg1
+    what: arg2
+
+    output = {talker}: SAY(what) [condition1 || condition2 ...]
+    
+Opcode 8 "EmitCode":
+    code = arg 1
+
+    if we have conditions:
+        emit "
+            if [conditions1 || condition2 ...]
+                {code}
+            endif
+        "
+    
+    If no conditions:
+        emit "{code}"
+
+Opcode 9 "DefineLabel":
+    Defines a goto label
+    Special case if starts with $if
+
+    label = arg1
+
+    if peek if-stack == label
+        pop if-stack
+        pending_else = true
+    else
+        emit "=== {arg1} ==="
+
+Opcode 10 "Goto":
+    Goto the specified label
+
+    emit "-> {arg1}"
+
+Opcode 19 "ElseGoto":
+    Opens an if else block. arg1 specifies the label corresponding to the else-part
+
+    goto_else = arg1
+
+    emit = "if [{cond}]"
+    push arg1 to if-stack
+
+Opcode 100-108 "Reply":
+    Present a dialog choice
+    
+    emit 

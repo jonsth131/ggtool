@@ -1,3 +1,5 @@
+use wax::{Glob, Pattern};
+
 use crate::{
     decoder::{self, decode_data, decode_yack_data},
     directory::GGValue,
@@ -10,8 +12,9 @@ use crate::{
 use crate::ktx_decompress;
 
 use std::{
+    fs::File,
     io::{BufReader, Seek, SeekFrom},
-    path::Path, fs::File,
+    path::Path,
 };
 
 pub struct OpenGGPack {
@@ -90,14 +93,17 @@ impl OpenGGPack {
         println!("{}", serde_json::to_string_pretty(&filenames).unwrap());
     }
 
-    pub fn extract_file(&mut self, filename: &str, outpath: &str) {
+    pub fn extract_files(&mut self, pattern: &str, outpath: &str, decompile_yacks: bool) {
+        let glob = Glob::new(pattern).unwrap();
         let file_list = self.get_files();
+        for file in &file_list {
+            if glob.is_match(&file.filename[..]) {
+                self.extract_file(file, outpath, decompile_yacks);
+            }
+        }
+    }
 
-        let file = file_list
-            .iter()
-            .find(|f| f.filename.eq(&filename))
-            .expect("File not found in ggpack");
-
+    pub fn extract_file(&mut self, file: &GGFile, outpath: &str, decompile_yacks: bool) {
         println!(
             "Extracting {}. Size = {}, offset = {}",
             file.filename, file.size, file.offset
@@ -116,16 +122,19 @@ impl OpenGGPack {
             decode_data(&mut data, &self.keys.key1, &self.keys.key2);
         }
 
-        if file.filename.ends_with(".yack") {
-            decode_yack_data(&mut data, &self.keys.key3, &file.filename);
-            let yack_lines = parse_yack(&data).expect("Failed to parse yack data");
-            for line in yack_lines {
-                println!("{}", line);
-            }
-        }
-
         let final_path = format!("{}/{}", outpath, file.filename);
-        if file.filename.ends_with(".json") || file.filename.ends_with(".wimpy") || file.filename.ends_with(".emitter") {
+
+        if file.filename.ends_with(".yack") && decompile_yacks {
+            decode_yack_data(&mut data, &self.keys.key3, &file.filename);
+            let outp = parse_yack(&data).expect("Failed to decompile yack");
+
+            std::fs::write(format!("{}.txt", final_path), outp)
+                .expect("Failed to write data to disk");
+        }
+        else if file.filename.ends_with(".json")
+            || file.filename.ends_with(".wimpy")
+            || file.filename.ends_with(".emitter")
+        {
             let expanded = GGValue::parse(data).expect("Failed to expand file");
 
             std::fs::write(final_path, serde_json::to_string_pretty(&expanded).unwrap())

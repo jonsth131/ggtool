@@ -1,28 +1,31 @@
 use clap::Parser;
 use libdinky;
 
-/// Return to Monkey Island ggpack tool
+///Return to Monkey Island ggpack tool
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 enum Args {
-    /// Extracts encryption keys from Return to Monkey Island.exe
+    ///Extracts encryption keys from Return to Monkey Island.exe
     ExtractKeys {
-        /// Path to Return to Monkey Island.exe
+        ///Path to Return to Monkey Island.exe
         exe_path: String,
     },
-    /// Lists files in the ggpack
+    ///Lists files in the ggpack
     ListFiles {
-        /// Path to the ggpack-file
+        ///Path to the ggpack-file
         pack_path: String,
     },
-    /// Extracts a file
-    ExtractFile {
-        /// Path to the ggpack-file
+    ///Extracts files
+    ExtractFiles {
+        ///Path to the ggpack-file
         pack_path: String,
-        // Name of the file to extract
-        filename: String,
-        // Output path
+        ///Pattern of files to extract.
+        ///For instance *.yack extracts all yack-files.
+        pattern: String,
+        ///Output path
         outpath: String,
+        ///Optional: Decompile *.yack files
+        decompile_yack: bool,
     },
 }
 
@@ -45,15 +48,16 @@ fn main() {
                 libdinky::ggpack::OpenGGPack::from_path(&pack_path).expect("Failed to open ggpack");
             pack.list_files()
         }
-        Args::ExtractFile {
+        Args::ExtractFiles {
             pack_path,
-            filename,
+            pattern,
             outpath,
+            decompile_yack,
         } => {
             let mut pack =
                 libdinky::ggpack::OpenGGPack::from_path(&pack_path).expect("Failed to open ggpack");
 
-            pack.extract_file(&filename, &outpath)
+            pack.extract_files(&pattern, &outpath, decompile_yack)
         }
     }
 }
