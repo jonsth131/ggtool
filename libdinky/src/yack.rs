@@ -5,6 +5,8 @@ use std::io::Cursor;
 #[derive(Debug, PartialEq)]
 enum YackOpcode {
     ActorSay = 1,
+    Assign = 2,
+    Pause = 5,
     WaitFor = 7,
     EmitCode = 8,
     DefineLabel = 9,
@@ -27,6 +29,8 @@ impl From<u8> for YackOpcode {
     fn from(what: u8) -> Self {
         match what {
             1 => Self::ActorSay,
+            2 => Self::Assign,
+            5 => Self::Pause,
             7 => Self::WaitFor,
             8 => Self::EmitCode,
             9 => Self::DefineLabel,
