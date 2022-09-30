@@ -153,10 +153,7 @@ impl OpenGGPack {
                 {
                     println!("Decompressing BPTC texture...");
                     let mut output_buffer: Vec<u8> = Vec::new();
-                    ktx_decompress::decompress_gl::decompress_bptc(
-                        &decompressed,
-                        &mut output_buffer,
-                    );
+                    ktx_decompress::decompress_gl::decompress_bptc(&v, &mut output_buffer);
                     std::fs::write(format!("{}.png", final_path), output_buffer)
                         .expect("Failed to write data to disk");
                 }
