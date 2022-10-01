@@ -15,7 +15,7 @@ cargo build --release --features decompress_ktx
 ```
 Whenever a *.ktxbz file is extracted, it is then also converted to PNG and saved alongside the extracted file.
 
-Note that this uses your OpenGL-driver for decompressing the BPTC-compressed data. Your milage may vary depending on your GPU is and how updated your drivers are.
+Note that this uses your OpenGL-driver for decompressing the BPTC-compressed data. Your milage may vary depending on your GPU and how updated your drivers are.
 
 # Usage
 ```
