@@ -1,0 +1,26 @@
+typedef unsigned int u32;
+
+struct Instruction {
+  unsigned char opcode;
+  switch(opcode) {
+  case 0: break;
+  default: 
+    u32 seq_number;
+    unsigned char num_conditions;
+    u32 conditions[num_conditions];
+  break;
+  }
+};
+
+struct StringTable {
+  u32 unk;
+  u32 num_strings;
+  zstring strings[num_strings];
+};
+
+struct Yack {
+  u32 code_start_marker;
+  struct StringTable* string_table_offset;
+  
+  struct Instruction instructions[__getCaretPos() / 18];
+};

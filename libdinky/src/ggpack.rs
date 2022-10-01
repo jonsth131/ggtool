@@ -5,6 +5,7 @@ use crate::{
     directory::GGValue,
     easy_br::EasyRead,
     keys::Keys,
+    ktx_decompressor::KTXDecompressor,
     yack::parse_yack,
 };
 
@@ -21,6 +22,7 @@ pub struct OpenGGPack {
     reader: BufReader<File>,
     directory: GGValue,
     keys: Keys,
+    ktx_decompressor: Option<Box<dyn KTXDecompressor>>,
 }
 
 #[derive(Debug)]
@@ -28,6 +30,15 @@ pub struct GGFile {
     pub filename: String,
     pub size: usize,
     pub offset: u64,
+}
+
+fn get_ktx_decompressor() -> Option<Box<dyn KTXDecompressor>> {
+    #[cfg(feature = "decompress_ktx")]
+    return Some(Box::new(
+        ktx_decompress::decompress_gl::OpenGLKTXDecompressor::new(),
+    ));
+    #[cfg(not(feature = "decompress_ktx"))]
+    None
 }
 
 impl OpenGGPack {
@@ -50,6 +61,7 @@ impl OpenGGPack {
             reader,
             directory: GGValue::parse(directory_data).expect("Failed to parse directory"),
             keys,
+            ktx_decompressor: get_ktx_decompressor(),
         })
     }
 
@@ -109,7 +121,6 @@ impl OpenGGPack {
             println!("No files extracted. The provided pattern '{}' didn't match any files in the archive.", pattern);
         }
     }
-
     pub fn extract_file(&mut self, file: &GGFile, outpath: &str, decompile_yacks: bool) {
         println!(
             "Extracting {}. Size = {}, offset = {}",
@@ -146,25 +157,27 @@ impl OpenGGPack {
             std::fs::write(final_path, serde_json::to_string_pretty(&expanded).unwrap())
                 .expect("Failed to write data to disk");
         } else if file.filename.ends_with(".ktxbz") || file.filename.ends_with(".ktxaz") {
-            Self::handle_ktxbz(&data, &final_path);
+            self.handle_ktxbz(&data, &final_path);
         } else {
             std::fs::write(final_path, data).expect("Failed to write data to disk");
         }
     }
 
-    fn handle_ktxbz(data: &Vec<u8>, final_path: &str) {
+    fn handle_ktxbz(&self, data: &Vec<u8>, final_path: &str) {
         println!("Inflating...");
         let decompressed = inflate::inflate_bytes_zlib(&data);
 
         match decompressed {
-            Ok(v) => {
-                std::fs::write(&final_path, &v).expect("Failed to write data to disk");
+            Ok(data) => {
+                std::fs::write(&final_path, &data).expect("Failed to write data to disk");
 
                 #[cfg(feature = "decompress_ktx")]
-                {
+                if let Some(decompressor) = &self.ktx_decompressor {
                     println!("Decompressing BPTC texture...");
                     let mut output_buffer: Vec<u8> = Vec::new();
-                    ktx_decompress::decompress_gl::decompress_bptc(&v, &mut output_buffer);
+
+                    decompressor.decompress_ktx(&data, &mut output_buffer);
+
                     std::fs::write(format!("{}.png", final_path), output_buffer)
                         .expect("Failed to write data to disk");
                 }
