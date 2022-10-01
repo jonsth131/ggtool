@@ -37,7 +37,10 @@ SUBCOMMANDS:
 
 ## Extract keys
 To use the tool the encryption keys need to be extracted from the 'Return to Monkey Island.exe' file.
+
 To do this run `ggtool extract-keys <EXE_FILE>` and the keys will be extracted to the folder *keys*.
+
+NB: This has been confirmed working with the macOS-binary as well.
 
 ## List files in ggpack
 To list existing files in a ggpack file run `ggtool list-files <PACK_PATH>`.
