@@ -22,17 +22,17 @@ Note that this uses your OpenGL-driver for decompressing the BPTC-compressed dat
 Return to Monkey Island ggpack tool
 
 USAGE:
-    ggtool <SUBCOMMAND>
+    ggtool.exe <SUBCOMMAND>
 
 OPTIONS:
     -h, --help       Print help information
     -V, --version    Print version information
 
 SUBCOMMANDS:
-    extract-file    Extracts a file
-    extract-keys    Extracts encryption keys from Return to Monkey Island.exe
-    help            Print this message or the help of the given subcommand(s)
-    list-files      Lists files in the ggpack
+    extract-files    Extracts files
+    extract-keys     Extracts encryption keys from Return to Monkey Island.exe
+    help             Print this message or the help of the given subcommand(s)
+    list-files       Lists files in the ggpack
 ```
 
 ## Extract keys
@@ -42,5 +42,7 @@ To do this run `ggtool extract-keys <EXE_FILE>` and the keys will be extracted t
 ## List files in ggpack
 To list existing files in a ggpack file run `ggtool list-files <PACK_PATH>`.
 
-## Extract a file from a ggpack
-To extract a file from a ggpack file run `ggtool extract-file <PACK_PATH> <FILENAME> <OUTPATH>`.
+## Extract file(s) from a ggpack
+To extract one or more file from a ggpack file, run `ggtool.exe extract-files <PACK_PATH> <PATTERN> <OUTPATH> [decompile-yack]`.
+Where `<PATTERN>` is a glob-pattern of the files to extract. For instance `AnchorKey02-hd.ktxbz` or `Anchor*`.
+If you supply `decompile-yack`. ggtool will also spit out text-readable \*.yack files.
