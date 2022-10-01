@@ -44,5 +44,7 @@ To list existing files in a ggpack file run `ggtool list-files <PACK_PATH>`.
 
 ## Extract file(s) from a ggpack
 To extract one or more file from a ggpack file, run `ggtool.exe extract-files <PACK_PATH> <PATTERN> <OUTPATH> [decompile-yack]`.
+
 Where `<PATTERN>` is a glob-pattern of the files to extract. For instance `AnchorKey02-hd.ktxbz` or `Anchor*`.
+
 If you supply `decompile-yack`. ggtool will also spit out text-readable \*.yack files.
