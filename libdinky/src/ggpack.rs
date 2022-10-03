@@ -142,12 +142,18 @@ impl OpenGGPack {
 
         let final_path = format!("{}/{}", outpath, file.filename);
 
-        if file.filename.ends_with(".yack") && decompile_yacks {
+        if file.filename.ends_with(".yack") {
             decode_yack_data(&mut data, &self.keys.key3, &file.filename);
-            let outp = parse_yack(&data).expect("Failed to decompile yack");
 
-            std::fs::write(format!("{}.txt", final_path), outp)
-                .expect("Failed to write data to disk");
+            if decompile_yacks {
+                let outp = parse_yack(&data).expect("Failed to decompile yack");
+
+                std::fs::write(format!("{}.txt", final_path), outp)
+                    .expect("Failed to write data to disk");
+            } else {
+                std::fs::write(final_path, data)
+                    .expect("Failed to write data to disk");
+            }
         } else if file.filename.ends_with(".json")
             || file.filename.ends_with(".wimpy")
             || file.filename.ends_with(".emitter")
