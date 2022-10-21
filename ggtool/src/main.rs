@@ -27,6 +27,11 @@ enum Args {
         ///Optional: Decompile *.yack files
         decompile_yack: bool,
     },
+    /// Dink handling
+    Dink {
+        /// Dink file
+        file: String,
+    },
 }
 
 fn extract_keys(exe_path: &str) {
@@ -61,6 +66,10 @@ fn main() {
                 libdinky::ggpack::OpenGGPack::from_path(&pack_path).expect("Failed to open ggpack");
 
             pack.extract_files(&pattern, &outpath, decompile_yack)
+        }
+        Args::Dink { file } => {
+            let result = libdinky::dink::read_dink(&file).expect("Failed to open dink file");
+            println!("{:?}", result);
         }
     }
 }
