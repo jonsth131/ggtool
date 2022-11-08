@@ -10,6 +10,7 @@ use std::{
 };
 
 pub enum GGValueType {
+    Null = 1,
     Dictionary = 2,
     List = 3,
     String = 4,
@@ -23,6 +24,7 @@ pub enum GGValueType {
 impl From<u8> for GGValueType {
     fn from(a: u8) -> Self {
         match a {
+            1 => GGValueType::Null,
             2 => GGValueType::Dictionary,
             3 => GGValueType::List,
             4 => GGValueType::String,
@@ -39,6 +41,7 @@ impl From<u8> for GGValueType {
 type IOResult<T> = Result<T, std::io::Error>;
 
 pub enum GGValue {
+    GGNull(),
     GGDict(HashMap<String, GGValue>),
     GGList(Vec<GGValue>),
     GGString(String),
@@ -51,6 +54,7 @@ impl Serialize for GGValue {
         S: serde::Serializer,
     {
         match self {
+            GGValue::GGNull() => serializer.serialize_unit(),
             GGValue::GGDict(d) => {
                 let mut map = serializer.serialize_map(Some(d.len()))?;
                 for (k, v) in d {
@@ -70,7 +74,6 @@ impl Serialize for GGValue {
         }
     }
 }
-
 
 impl GGValue {
     pub fn expect_dict(&self) -> &HashMap<String, GGValue> {
@@ -192,9 +195,14 @@ impl DirectoryBuilder {
         Ok(GGValue::GGNumber(num))
     }
 
+    fn read_null(&mut self) -> IOResult<GGValue> {
+        Ok(GGValue::GGNull())
+    }
+
     fn read_ggvalue(&mut self) -> IOResult<GGValue> {
         let type_: GGValueType = self.reader.read_u8()?.into();
         match type_ {
+            GGValueType::Null => self.read_null(),
             GGValueType::Dictionary => self.read_dict(),
             GGValueType::List => self.read_list(),
             GGValueType::String => self.read_string(),
