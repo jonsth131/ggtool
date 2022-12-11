@@ -1,84 +1,68 @@
-use glutin::PossiblyCurrent;
+use glfw::Context;
+use glow::{HasContext, RGBA, TEXTURE_2D, UNSIGNED_BYTE};
 use ktx::KtxInfo;
-use std::ffi::c_void;
 
 use crate::ktx_decompressor::KTXDecompressor;
 
-mod gl {
-    include!(concat!(env!("OUT_DIR"), "/bindings.rs"));
-}
-
 pub struct OpenGLKTXDecompressor {
-    _event_loop: glutin::event_loop::EventLoop<()>,
-    _context: glutin::Context<PossiblyCurrent>,
+    gl: glow::Context,
+    window: glfw::Window,
 }
 
 impl OpenGLKTXDecompressor {
     pub fn new() -> Self {
-        let event_loop = glutin::event_loop::EventLoop::new();
-        let contextbuilder = glutin::ContextBuilder::new();
-        let context = contextbuilder
-            .build_headless(
-                &event_loop,
-                glutin::dpi::PhysicalSize {
-                    width: 1,
-                    height: 1,
-                },
-            )
-            .expect("Failed to create OpenGL Context");
+        let mut glfw = glfw::init(glfw::FAIL_ON_ERRORS).unwrap();
+        let (mut window, _event_receiver) = glfw
+            .create_window(640, 480, "KTX Decompressor", glfw::WindowMode::Windowed)
+            .unwrap();
+        window.make_current();
 
         unsafe {
-            let current_context = context
-                .make_current()
-                .expect("Failed to make OpenGL context current");
+            let gl = glow::Context::from_loader_function(|s| window.get_proc_address(s));
 
-            gl::load_with(|s| current_context.get_proc_address(s) as *const _);
-            
-            let mut gl_texture: u32 = 0;
-            gl::Enable(gl::TEXTURE_2D);
-            gl::GenTextures(1, &mut gl_texture);
-            gl::BindTexture(gl::TEXTURE_2D, gl_texture);
+            use glow::*;
 
-            return Self {
-                _event_loop: event_loop,
-                _context: current_context,
-            };
+            gl.enable(TEXTURE_2D);
+            let gl_texture = gl.create_texture().expect("Failed to create texture");
+            gl.bind_texture(TEXTURE_2D, Some(gl_texture));
+
+            Self { gl, window }
         }
     }
 
     fn gpu_decompress_texture(
         &self,
         ktx_texture_data: &Vec<u8>,
-        target_texture_data: &mut Vec<u8>,
+        target_texture_data: &mut [u8],
         width: u32,
         height: u32,
         gl_internal_format: u32,
     ) {
         unsafe {
-            gl::CompressedTexImage2D(
-                gl::TEXTURE_2D,
+            self.gl.compressed_tex_image_2d(
+                TEXTURE_2D,
                 0,
-                gl_internal_format,
-                width as gl::types::GLsizei,
-                height as gl::types::GLsizei,
+                gl_internal_format as i32,
+                width as i32,
+                height as i32,
                 0,
-                ktx_texture_data.len() as gl::types::GLsizei,
-                ktx_texture_data.as_ptr() as *const c_void,
+                ktx_texture_data.len() as i32,
+                ktx_texture_data,
             );
 
-            gl::GetTexImage(
-                gl::TEXTURE_2D,
+            self.gl.get_tex_image(
+                TEXTURE_2D,
                 0,
-                gl::RGBA,
-                gl::UNSIGNED_BYTE,
-                target_texture_data.as_mut_ptr() as *mut c_void,
+                RGBA,
+                UNSIGNED_BYTE,
+                glow::PixelPackData::Slice(target_texture_data),
             );
         }
     }
 }
 
 impl KTXDecompressor for OpenGLKTXDecompressor {
-    fn decompress_ktx(&self, data: &Vec<u8>, output_texture_data: &mut Vec<u8>) -> () {
+    fn decompress_ktx(&self, data: &Vec<u8>, output_texture_data: &mut Vec<u8>) {
         let cursor = std::io::Cursor::new(&data);
         let decoder = ktx::Decoder::new(cursor).expect("Failed to create KTX decoder");
 
